@@ -57,7 +57,13 @@ async function installArchive({ platform, binDir, binaryName, binaryPath, url, t
       run('tar', ['-xzf', tmpFile, '-C', binDir, binaryName]);
     }
 
-    fs.chmodSync(binaryPath, 0o755);
+    if (!fs.existsSync(binaryPath)) {
+      throw new Error(`Binary missing after extract: ${binaryPath}`);
+    }
+    // chmod is meaningful on Unix; Windows may not need it.
+    if (platform.platform !== 'windows') {
+      fs.chmodSync(binaryPath, 0o755);
+    }
     console.log(`zhizai installed at ${binaryPath}`);
   } finally {
     try { fs.unlinkSync(tmpFile); } catch (_) {}
@@ -70,7 +76,9 @@ async function main() {
   const binaryName = getBinaryName(platform);
   const binaryPath = path.join(binDir, binaryName);
   const url = getDownloadURL(platform);
-  const tmpFile = path.join(os.tmpdir(), `zhizai-download-${Date.now()}`);
+  // Expand-Archive on Windows requires a .zip extension; tar.gz similarly.
+  const archiveExt = platform.platform === 'windows' ? '.zip' : '.tar.gz';
+  const tmpFile = path.join(os.tmpdir(), `zhizai-download-${Date.now()}${archiveExt}`);
 
   if (fs.existsSync(binaryPath)) {
     try {
