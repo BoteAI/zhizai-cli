@@ -49,6 +49,7 @@ dev-link: build
 	@echo "Linked $(BINARY) -> bin/zhizai and bin/zz for local npm launcher"
 
 # Tag + push to trigger GitHub Actions Release / npm publish.
-# Examples: make release | make release VERSION=0.0.2 | make release VERSION=patch
+# Examples: make release | make release V=0.0.2 | make release V=patch
+# Do not use VERSION= here — VERSION is reserved for go build ldflags.
 release:
-	@bash scripts/release.sh $(VERSION)
+	@bash scripts/release.sh $(V)
