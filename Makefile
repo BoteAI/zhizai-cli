@@ -37,10 +37,13 @@ install: build
 	@echo "Installing to $(INSTALL_DIR)/zhizai"
 	@mkdir -p $(INSTALL_DIR)
 	install -m 755 $(BINARY) $(INSTALL_DIR)/zhizai
+	@ln -sf zhizai $(INSTALL_DIR)/zz
+	@echo "Alias installed: $(INSTALL_DIR)/zz -> zhizai"
 	@echo "Done."
 
 dev-link: build
 	@mkdir -p bin
 	@cp $(BINARY) bin/zhizai
 	@chmod 755 bin/zhizai
-	@echo "Linked $(BINARY) -> bin/zhizai for local npm launcher"
+	@ln -sf zhizai bin/zz
+	@echo "Linked $(BINARY) -> bin/zhizai and bin/zz for local npm launcher"

@@ -30,7 +30,7 @@ make install
 | `zhizai-cli` | `make build` 直接产物 |
 | `bin/zhizai` | `make dev-link` 复制到 npm 启动器目录 |
 
-安装后命令名为 `zhizai`，短别名预留为 `zz`。
+安装后可用命令：`zhizai` 与短别名 `zz`（`make install` 会安装符号链接；npm 全局安装同样注册两个入口）。
 
 ### npm 全局安装（Release 后可用）
 
