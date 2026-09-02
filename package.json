@@ -1,0 +1,30 @@
+{
+  "name": "@zhizai/cli",
+  "version": "0.1.0",
+  "description": "CLI tool for 智在记录 — manage notes and knowledge from the terminal and AI agents",
+  "keywords": [
+    "zhizai",
+    "zhiji",
+    "cli",
+    "notes"
+  ],
+  "homepage": "https://github.com/BoteAI/zhizai-cli",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BoteAI/zhizai-cli.git"
+  },
+  "license": "MIT",
+  "bin": {
+    "zhizai": "./bin/zhizai.js",
+    "zz": "./bin/zhizai.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "files": [
+    "bin/zhizai.js",
+    "scripts/",
+    "skills/",
+    "README.md"
+  ]
+}
