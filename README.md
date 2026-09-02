@@ -4,7 +4,7 @@
 
 查笔记、写总结、管知识库——一条命令搞定，支持脚本和 AI Agent 调用。
 
-> **当前版本：v0.1.0**  
+> **当前版本：v0.0.1**  
 > 已实现：`auth` / `doctor` / `capabilities` / `version` / `notes` / `note get` / `setup`。  
 > 其余业务命令（`note create` / `ask` / `team` 等）已挂载子命令树，实现中。
 
@@ -41,6 +41,23 @@ zhizai doctor -o json
 ```
 
 `postinstall` 会下载对应平台的二进制；发布 Release 前请优先用源码构建。
+
+### 维护者发版
+
+仓库已配置 tag 触发：构建多平台二进制 → GitHub Release → `npm publish`。
+
+前置：GitHub Actions Secret 配置 `NPM_TOKEN`；本地 `.npmrc` 仅用于本机 npm，**不要提交**（见 `.npmrc.example`）。
+
+```bash
+# 使用 package.json 当前版本打 tag 并推送
+make release
+# 或
+npm run release
+
+# 升版本后再发
+make release VERSION=patch
+make release VERSION=0.0.2
+```
 
 ---
 

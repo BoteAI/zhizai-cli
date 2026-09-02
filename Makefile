@@ -3,7 +3,7 @@ VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "
 LDFLAGS    := -ldflags "-X github.com/BoteAI/zhizai-cli/internal/version.Version=$(VERSION) -s -w"
 BUILD_DIR  := dist
 
-.PHONY: build build-all clean test lint install
+.PHONY: build build-all clean test lint install release
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) .
@@ -47,3 +47,8 @@ dev-link: build
 	@chmod 755 bin/zhizai
 	@ln -sf zhizai bin/zz
 	@echo "Linked $(BINARY) -> bin/zhizai and bin/zz for local npm launcher"
+
+# Tag + push to trigger GitHub Actions Release / npm publish.
+# Examples: make release | make release VERSION=0.0.2 | make release VERSION=patch
+release:
+	@bash scripts/release.sh $(VERSION)

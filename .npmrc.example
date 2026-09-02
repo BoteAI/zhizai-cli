@@ -1,0 +1,3 @@
+# Copy to .npmrc for local npm auth (never commit .npmrc).
+# CI uses GitHub Actions secret NPM_TOKEN instead.
+//registry.npmjs.org/:_authToken=${NPM_TOKEN}
