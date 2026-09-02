@@ -54,9 +54,9 @@ make release
 # 或
 npm run release
 
-# 升版本后再发
-make release VERSION=patch
-make release VERSION=0.0.2
+# 升版本后再发（注意用 V=，不要用 VERSION=）
+make release V=patch
+make release V=0.0.2
 ```
 
 ---
