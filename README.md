@@ -4,7 +4,7 @@
 
 查笔记、写总结、管知识库——一条命令搞定，支持脚本和 AI Agent 调用。
 
-> **当前版本：v0.0.1**  
+> **当前版本：v0.0.2**  
 > 已实现：`auth` / `doctor` / `capabilities` / `version` / `notes` / `note get` / `setup`。  
 > 其余业务命令（`note create` / `ask` / `team` 等）已挂载子命令树，实现中。
 

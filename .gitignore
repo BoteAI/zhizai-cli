@@ -7,3 +7,4 @@ bin/zhizai.exe
 *.out
 .DS_Store
 .npmrc
+*.tgz
