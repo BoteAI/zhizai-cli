@@ -79,7 +79,7 @@ func evaluate(authOK bool, ping func() error) response {
 	apiOK := false
 	apiMsg := "OpenAPI 探活失败"
 	if !authOK {
-		apiMsg = "跳过：未配置 API Key"
+		apiMsg = "跳过：未登录"
 	} else if ping != nil && ping() == nil {
 		apiOK = true
 		apiMsg = "OpenAPI 连通正常"
@@ -115,7 +115,7 @@ func requiredChecksReady(checks []check) bool {
 
 func authMessage(ok bool) string {
 	if ok {
-		return "API Key 已配置"
+		return "已登录"
 	}
-	return "未配置 API Key"
+	return "未登录，请运行 zhizai auth login"
 }

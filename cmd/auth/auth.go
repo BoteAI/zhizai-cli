@@ -20,9 +20,8 @@ func NewAuthCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",
 		Short: "管理认证",
-		Long:  "网页设备授权登录、API Key 登录、刷新令牌或检查状态。凭证保存在本机 ~/.zhizai/config.json。",
+		Long:  "默认通过网页设备授权登录；也可刷新令牌或查看状态。凭证保存在本机 ~/.zhizai/config.json。",
 		Example: `  zhizai auth login
-  zhizai auth login --api-key <key>
   zhizai auth refresh
   zhizai auth status
   zhizai auth logout`,
@@ -41,12 +40,9 @@ func newLoginCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
 		Args:  cobra.NoArgs,
-		Short: "登录（默认网页设备授权）",
-		Long: `默认走 OAuth 2.0 设备授权：打开浏览器确认后，CLI 轮询获取 access_token。
-
-使用 --api-key 可跳过网页授权（适合脚本/CI）。两种模式互斥，后登录的会清掉另一种凭证。`,
-		Example: `  zhizai auth login
-  zhizai auth login --api-key <key>`,
+		Short: "登录（网页设备授权）",
+		Long:  `通过 OAuth 2.0 设备授权登录：打开浏览器确认后，CLI 轮询获取 access_token。`,
+		Example: `  zhizai auth login`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
 			printServiceEndpoint(out)
@@ -58,21 +54,36 @@ func newLoginCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&key, "api-key", "", "API Key（跳过网页授权，适合脚本/CI）")
+	cmd.Flags().StringVar(&key, "api-key", "", "API Key（仅网页授权失败时的备用方式）")
+	_ = cmd.Flags().MarkHidden("api-key")
 	return cmd
 }
 
 func printServiceEndpoint(out io.Writer) {
+	if !config.AllowEnvSwitch() {
+		return
+	}
 	cfg := config.Get()
 	apiBase := config.ResolveAPIBaseURL(cfg)
 	oauthBase := config.ResolveOAuthBaseURL(cfg)
 	env := config.ActiveEnvName(cfg)
-	fmt.Fprintf(out, "服务环境: %s\n业务基址: %s\n", env, apiBase)
+	fmt.Fprintf(out, "服务环境: %s（开发模式 ZHIZAI_DEV=1）\n业务基址: %s\n", env, apiBase)
 	if oauthBase == apiBase {
 		fmt.Fprintf(out, "OAuth基址: %s（与业务共用）\n", oauthBase)
 	} else {
 		fmt.Fprintf(out, "OAuth基址: %s\n", oauthBase)
 	}
+}
+
+func apiKeyFallbackHint() string {
+	return "\n\n若网页授权失败，可改用 API Key：\n  zhizai auth login --api-key <your-api-key>"
+}
+
+func wrapAuthFailure(err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%w%s", err, apiKeyFallbackHint())
 }
 
 func loginWithAPIKey(out io.Writer, key string) error {
@@ -106,12 +117,14 @@ func runDeviceFlow(out io.Writer) error {
 	c := client.New()
 	session, rawAuth, err := c.DeviceAuthorize("")
 	if err != nil {
-		if rawAuth != "" {
+		if config.AllowEnvSwitch() && rawAuth != "" {
 			fmt.Fprintf(out, "[oauth] device/authorize 原始返回:\n%s\n", rawAuth)
 		}
-		return fmt.Errorf("创建设备授权会话失败: %w", err)
+		return wrapAuthFailure(fmt.Errorf("创建设备授权会话失败: %w", err))
 	}
-	fmt.Fprintf(out, "[oauth] device/authorize 原始返回:\n%s\n", rawAuth)
+	if config.AllowEnvSwitch() {
+		fmt.Fprintf(out, "[oauth] device/authorize 原始返回:\n%s\n", rawAuth)
+	}
 
 	openURL := session.VerificationURIComplete
 	if openURL == "" {
@@ -138,32 +151,36 @@ func runDeviceFlow(out io.Writer) error {
 	for time.Now().Before(deadline) {
 		pollN++
 		token, pending, rawPoll, err := c.PollDeviceToken(session.DeviceCode)
-		fmt.Fprintf(out, "\n[oauth] token 轮询 #%d 原始返回:\n%s\n", pollN, maskTokenJSON(rawPoll))
+		if config.AllowEnvSwitch() {
+			fmt.Fprintf(out, "\n[oauth] token 轮询 #%d 原始返回:\n%s\n", pollN, maskTokenJSON(rawPoll))
+		}
 		if err != nil {
+			var fail error
 			switch pending {
 			case "access_denied":
-				return fmt.Errorf("用户拒绝了授权")
+				fail = fmt.Errorf("用户拒绝了授权")
 			case "expired_token", "invalid_grant":
-				return fmt.Errorf("授权会话已失效（%s），请重新运行 zhizai auth login", pending)
+				fail = fmt.Errorf("授权会话已失效（%s），请重新运行 zhizai auth login", pending)
 			case "invalid_client":
-				return fmt.Errorf("客户端配置无效（%s），请检查 client_id", pending)
+				fail = fmt.Errorf("客户端配置无效（%s），请检查 client_id", pending)
 			case "unauthorized_client":
-				return fmt.Errorf("客户端不允许设备授权（%s），请检查授权模式", pending)
+				fail = fmt.Errorf("客户端不允许设备授权（%s），请检查授权模式", pending)
 			case "invalid_scope":
-				return fmt.Errorf("请求 scope 不在授权范围内（%s）", pending)
+				fail = fmt.Errorf("请求 scope 不在授权范围内（%s）", pending)
 			case "unsupported_grant_type":
-				return fmt.Errorf("grant_type 不受支持（%s），请升级 CLI", pending)
+				fail = fmt.Errorf("grant_type 不受支持（%s），请升级 CLI", pending)
 			case "invalid_request":
-				return fmt.Errorf("请求参数不符合要求（%s）", pending)
+				fail = fmt.Errorf("请求参数不符合要求（%s）", pending)
 			case "server_error":
-				return fmt.Errorf("服务端错误（%s），请稍后重试或联系平台", pending)
+				fail = fmt.Errorf("服务端错误（%s），请稍后重试或联系平台", pending)
 			default:
-				return fmt.Errorf("轮询 token 失败: %w", err)
+				fail = fmt.Errorf("轮询 token 失败: %w", err)
 			}
+			return wrapAuthFailure(fail)
 		}
 		if token != nil {
 			if err := config.Get().SetOAuthLogin(token.AccessToken, token.RefreshToken, token.TokenType, token.Scope, int(token.ExpiresIn)); err != nil {
-				return fmt.Errorf("saving tokens: %w", err)
+				return wrapAuthFailure(fmt.Errorf("saving tokens: %w", err))
 			}
 			if err := client.New().Ping(); err != nil {
 				fmt.Fprintf(out, "⚠️ 令牌已保存，但探活失败: %v\n", err)
@@ -174,7 +191,11 @@ func runDeviceFlow(out io.Writer) error {
 			return nil
 		}
 
-		fmt.Fprintf(out, "[oauth] 状态=%s，继续等待...\n", pending)
+		if config.AllowEnvSwitch() {
+			fmt.Fprintf(out, "[oauth] 状态=%s，继续等待...\n", pending)
+		} else {
+			fmt.Fprint(out, ".")
+		}
 		wait := interval
 		if pending == "slow_down" {
 			wait = interval + 5*time.Second
@@ -183,7 +204,7 @@ func runDeviceFlow(out io.Writer) error {
 	}
 
 	fmt.Fprintln(out)
-	return fmt.Errorf("授权超时，请重新运行 zhizai auth login")
+	return wrapAuthFailure(fmt.Errorf("授权超时，请重新运行 zhizai auth login"))
 }
 
 // maskTokenJSON redacts access_token / refresh_token in raw JSON for console logs.

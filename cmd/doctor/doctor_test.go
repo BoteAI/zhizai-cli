@@ -3,10 +3,10 @@ package doctor
 import "testing"
 
 func TestAuthMessage(t *testing.T) {
-	if got := authMessage(true); got != "API Key 已配置" {
+	if got := authMessage(true); got != "已登录" {
 		t.Fatalf("authMessage(true) = %q", got)
 	}
-	if got := authMessage(false); got != "未配置 API Key" {
+	if got := authMessage(false); got != "未登录，请运行 zhizai auth login" {
 		t.Fatalf("authMessage(false) = %q", got)
 	}
 }

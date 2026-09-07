@@ -38,9 +38,7 @@ zz version
 
 ## 使用要求
 
-- 需要有效的智在记录 **API Key**
-- 获取入口：[智在记录开发者](https://www.zzjilu.com/pc/developer)
-- 请求头：`Authorization: <api-key>`（**不要**加 `Bearer`）
+- 通过 `zhizai auth login` 完成**网页授权登录**
 - 限流：最高约 **2 次/秒**
 
 ---
@@ -49,29 +47,17 @@ zz version
 
 ### 1. 登录
 
-默认走**网页设备授权**（打开浏览器确认）：
-
 ```bash
 zhizai auth login
 ```
 
-脚本 / CI 可继续用 API Key：
-
-```bash
-zhizai auth login --api-key <your-api-key>
-# 或
-export ZHIZAI_REC_API_KEY=<your-api-key>
-```
-
-登录成功后写入 `~/.zhizai/config.json`。OAuth 与 API Key **互斥**，后登录的会清掉另一种。
+按提示在浏览器确认授权即可。登录成功后写入 `~/.zhizai/config.json`。
 
 刷新 OAuth access_token（业务请求也会在过期时自动刷新）：
 
 ```bash
 zhizai auth refresh
 ```
-
-当前默认服务环境为 **dev**（lingxi）。切换方式见下方「服务环境」。
 
 ### 2. 检查状态
 
@@ -114,8 +100,7 @@ zhizai setup
 
 | 命令 | 说明 |
 |------|------|
-| `zhizai auth login` | 网页设备授权登录（默认） |
-| `zhizai auth login --api-key <key>` | API Key 登录（脚本/CI） |
+| `zhizai auth login` | 网页设备授权登录 |
 | `zhizai auth refresh` | 刷新 OAuth access_token |
 | `zhizai auth status` | 查看认证状态（凭证掩码） |
 | `zhizai auth logout` | 清除本机凭证 |
@@ -141,39 +126,10 @@ zhizai setup
 
 ---
 
-## 服务环境
-
-业务 API 与 OAuth 可使用不同基址。预设在 `internal/config/endpoints.go` 的 `EnvPresets`：
-
-| 环境 | 业务基址 | OAuth 基址 |
-|------|----------|------------|
-| `dev`（默认） | `https://lingxi.iwhalecloud.com/LCDP-RECORD/api/v1` | `https://lingxi.iwhalecloud.com/zzjl/server` |
-| `test` | `https://lingxi.iwhalecloud.com/zzjl/api/v1` | `https://lingxi.iwhalecloud.com/zzjl/server` |
-| `prod` | `https://openapi.zzjilu.com/api/v1` | 与业务共用 |
-
-优先级：`ZHIZAI_API_URL` / `ZHIZAI_OAUTH_URL` > `config.json` 的 `api_url` / `oauth_url` > `ZHIZAI_ENV` / `config.env` > 默认 `dev`。
-
-LCDP 直连基址（若手动配置且以 `/note` 结尾）拼接 `/note/...` 时会自动去掉重复的 `/note`。
-
-```bash
-# 切到测试环境
-export ZHIZAI_ENV=test
-
-# 切到生产
-export ZHIZAI_ENV=prod
-
-# 或分别覆盖业务 / OAuth 基址
-export ZHIZAI_API_URL=https://lingxi.iwhalecloud.com/zzjl/api/v1
-export ZHIZAI_OAUTH_URL=https://lingxi.iwhalecloud.com/zzjl/server
-```
-
----
-
 ## 全局参数
 
 | 参数 | 说明 |
 |------|------|
-| `--api-key <key>` | 临时覆盖 API Key |
 | `-o, --output table\|json` | 输出格式（默认 `table`） |
 
 机器 / AI Agent 调用时请加 `-o json`，统一读取：
@@ -192,36 +148,15 @@ export ZHIZAI_OAUTH_URL=https://lingxi.iwhalecloud.com/zzjl/server
 
 ## 配置
 
-凭证保存在 `~/.zhizai/config.json`：
-
-```json
-{
-  "api_key": "xxxx",
-  "expires_at": "2027-12-31 23:59:59",
-  "team_id": ""
-}
-```
-
-凭证优先级：
-
-```text
---api-key  >  环境变量 ZHIZAI_REC_API_KEY  >  ~/.zhizai/config.json
-```
-
-| 环境变量 | 说明 |
-|----------|------|
-| `ZHIZAI_REC_API_KEY` | API Key |
-| `ZHIZAI_API_URL` | 覆盖业务 API 基址 |
-| `ZHIZAI_OAUTH_URL` | 覆盖 OAuth 基址（authorize/token/refresh） |
+凭证保存在 `~/.zhizai/config.json`（含 OAuth `access_token` / `refresh_token` 等字段）。
 
 ### 鉴权说明
 
-支持两种互斥模式：
-
-1. **OAuth 设备授权（默认）**：`zhizai auth login` → 浏览器确认 → 保存 `access_token` / `refresh_token`；业务请求头 `X-OAuth2-Access-Token: Bearer …`
-2. **API Key**：`zhizai auth login --api-key …` 或环境变量 `ZHIZAI_REC_API_KEY`；请求头 `Authorization: <api-key>`（不加 Bearer）
+默认使用 **OAuth 设备授权**：`zhizai auth login` → 浏览器确认 → 业务请求头 `X-OAuth2-Access-Token: Bearer …`。
 
 OAuth 过期时 CLI 会自动用 `refresh_token` 刷新；也可手动 `zhizai auth refresh`。
+
+仅当网页授权失败时，CLI 会提示可改用 API Key 备用登录。
 
 ---
 

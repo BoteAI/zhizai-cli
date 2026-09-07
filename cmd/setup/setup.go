@@ -206,7 +206,7 @@ func NewSetupCmd() *cobra.Command {
 
 			authed := config.Get().IsLoggedIn() || os.Getenv("ZHIZAI_REC_API_KEY") != ""
 			if !skipAuth && !authed {
-				writeProgress(cmd, outFormat, "接下来请配置智在记录 API Key…")
+				writeProgress(cmd, outFormat, "接下来请完成网页授权登录…")
 				login := exec.Command(os.Args[0], "auth", "login")
 				login.Stdin = cmd.InOrStdin()
 				configureInstallProcess(login, outFormat, cmd.OutOrStdout(), cmd.ErrOrStderr())
@@ -219,7 +219,7 @@ func NewSetupCmd() *cobra.Command {
 			platforms, actions := setupPlatformResults(resolved, true)
 			next := "说“帮我列出最近笔记”完成验证"
 			if !authed {
-				next = "运行 zhizai auth login --api-key <key> 完成授权"
+				next = "运行 zhizai auth login 完成网页授权"
 			}
 			return writeResult(cmd, outFormat, result{
 				Success:         true,

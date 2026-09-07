@@ -1,14 +1,39 @@
 package config
 
 import (
-	"os"
 	"testing"
 )
 
-func TestResolveAPIBaseURL_Presets(t *testing.T) {
+func enableDevSwitch(t *testing.T) {
+	t.Helper()
+	t.Setenv("ZHIZAI_DEV", "1")
 	t.Setenv("ZHIZAI_API_URL", "")
 	t.Setenv("ZHIZAI_OAUTH_URL", "")
 	t.Setenv("ZHIZAI_ENV", "")
+}
+
+func TestPublishedLocksToProd(t *testing.T) {
+	t.Setenv("ZHIZAI_DEV", "")
+	t.Setenv("ZHIZAI_ENV", "test")
+	t.Setenv("ZHIZAI_API_URL", "https://evil.example/api")
+	t.Setenv("ZHIZAI_OAUTH_URL", "https://evil.example/oauth")
+
+	if AllowEnvSwitch() {
+		t.Fatal("AllowEnvSwitch should be false without ZHIZAI_DEV=1")
+	}
+	if got := ResolveAPIBaseURL(&Config{Env: EnvTest, APIURL: "https://cfg.example"}); got != EnvPresets[EnvProd].APIBase {
+		t.Fatalf("published API = %q", got)
+	}
+	if got := ResolveOAuthBaseURL(&Config{Env: EnvDev, OAuthURL: "https://cfg.example"}); got != EnvPresets[EnvProd].OAuthBase {
+		t.Fatalf("published OAuth = %q", got)
+	}
+	if ActiveEnvName(&Config{Env: EnvTest}) != EnvProd {
+		t.Fatal("published ActiveEnvName must be prod")
+	}
+}
+
+func TestResolveAPIBaseURL_Presets(t *testing.T) {
+	enableDevSwitch(t)
 
 	got := ResolveAPIBaseURL(&Config{})
 	want := EnvPresets[DefaultEnv].APIBase
@@ -33,13 +58,10 @@ func TestResolveAPIBaseURL_Presets(t *testing.T) {
 	if got != "https://override.example/v1" {
 		t.Fatalf("ZHIZAI_API_URL should win, got %q", got)
 	}
-	_ = os.Unsetenv
 }
 
 func TestResolveOAuthBaseURL(t *testing.T) {
-	t.Setenv("ZHIZAI_API_URL", "")
-	t.Setenv("ZHIZAI_OAUTH_URL", "")
-	t.Setenv("ZHIZAI_ENV", "")
+	enableDevSwitch(t)
 
 	got := ResolveOAuthBaseURL(&Config{})
 	if got != EnvPresets[DefaultEnv].OAuthBase {
@@ -87,8 +109,7 @@ func TestNormalizeEnv(t *testing.T) {
 		t.Fatal("sit should map to test")
 	}
 
-	t.Setenv("ZHIZAI_API_URL", "")
-	t.Setenv("ZHIZAI_OAUTH_URL", "")
+	enableDevSwitch(t)
 	t.Setenv("ZHIZAI_ENV", "test")
 	got := ResolveAPIBaseURL(&Config{})
 	if got != EnvPresets[EnvTest].APIBase {
@@ -149,7 +170,7 @@ func TestJoinOAuthURL(t *testing.T) {
 }
 
 func TestActiveEnvName_CustomWhenOAuthOverride(t *testing.T) {
-	t.Setenv("ZHIZAI_API_URL", "")
+	enableDevSwitch(t)
 	t.Setenv("ZHIZAI_OAUTH_URL", "https://oauth.example/server")
 	t.Setenv("ZHIZAI_ENV", "prod")
 	if ActiveEnvName(&Config{}) != "custom" {

@@ -29,7 +29,7 @@ func NewCapabilitiesCmd() *cobra.Command {
 				CLIVersion:      version.String(),
 				ContractVersion: "0.1.0",
 				Commands: map[string]string{
-					"auth login":  "保存 API Key 并探活",
+					"auth login":  "网页设备授权登录并探活",
 					"auth status": "查看认证状态",
 					"auth logout": "清除本机凭证",
 					"doctor":      "检查 CLI、认证与 API",

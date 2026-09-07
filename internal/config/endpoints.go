@@ -33,14 +33,13 @@ type EnvEndpoints struct {
 
 // EnvPresets maps env name → API and OAuth bases.
 //
-// 快速切换方式（优先级从高到低）：
+// 快速切换（仅本地开发，需 export ZHIZAI_DEV=1）：
 //  1. 环境变量 ZHIZAI_API_URL / ZHIZAI_OAUTH_URL（完整覆盖）
 //  2. config.json 的 api_url / oauth_url
 //  3. 环境变量 ZHIZAI_ENV 或 config.json 的 env（查本表）
-//  4. DefaultEnv
+//  4. DefaultEnv（prod）
 //
-// 业务相对路径固定为 /note/...；若 APIBase 已以 /note 结尾（LCDP），
-// JoinAPIURL 会去掉重复的 /note 前缀。
+// 未设置 ZHIZAI_DEV=1 时（发布包默认），始终使用 EnvProd，忽略上述切换项。
 var EnvPresets = map[string]EnvEndpoints{
 	EnvProd: {
 		APIBase:   "https://openapi.zzjilu.com/api/v1",
@@ -65,11 +64,23 @@ var ServiceBaseURLs = map[string]string{
 }
 
 // DefaultEnv is used when neither ZHIZAI_ENV nor config.env is set.
-const DefaultEnv = EnvDev
+// Published builds always resolve to prod regardless of this constant when AllowEnvSwitch is false.
+const DefaultEnv = EnvProd
 
 // DefaultAPIBaseURL is the resolved default for the active DefaultEnv.
 // Kept for backward-compatible imports; prefer ResolveAPIBaseURL.
 var DefaultAPIBaseURL = EnvPresets[DefaultEnv].APIBase
+
+// AllowEnvSwitch reports whether non-prod endpoint switching is enabled.
+//
+// Published / end-user binaries lock to production. Local developers must set:
+//
+//	export ZHIZAI_DEV=1
+//
+// then ZHIZAI_ENV / api_url / oauth_url take effect.
+func AllowEnvSwitch() bool {
+	return strings.TrimSpace(os.Getenv("ZHIZAI_DEV")) == "1"
+}
 
 // NormalizeEnv returns a known env name or DefaultEnv.
 func NormalizeEnv(name string) string {
@@ -86,6 +97,9 @@ func NormalizeEnv(name string) string {
 }
 
 func resolveEnvName(cfg *Config) string {
+	if !AllowEnvSwitch() {
+		return EnvProd
+	}
 	if v := strings.TrimSpace(os.Getenv("ZHIZAI_ENV")); v != "" {
 		return NormalizeEnv(v)
 	}
@@ -101,6 +115,9 @@ func trimBase(v string) string {
 
 // ResolveAPIBaseURL returns the business API base URL without trailing slash.
 func ResolveAPIBaseURL(cfg *Config) string {
+	if !AllowEnvSwitch() {
+		return trimBase(EnvPresets[EnvProd].APIBase)
+	}
 	if v := trimBase(os.Getenv("ZHIZAI_API_URL")); v != "" {
 		return v
 	}
@@ -118,10 +135,14 @@ func ResolveAPIBaseURL(cfg *Config) string {
 
 // ResolveOAuthBaseURL returns the OAuth2 API base URL without trailing slash.
 //
-// Priority: ZHIZAI_OAUTH_URL → config.oauth_url → named-env preset →
+// When AllowEnvSwitch is false, always returns production OAuth base.
+// Otherwise priority: ZHIZAI_OAUTH_URL → config.oauth_url → named-env preset →
 // if only a custom api_url/ZHIZAI_API_URL is set, fall back to that API base
 // (single-base mode, matches production).
 func ResolveOAuthBaseURL(cfg *Config) string {
+	if !AllowEnvSwitch() {
+		return trimBase(EnvPresets[EnvProd].OAuthBase)
+	}
 	if v := trimBase(os.Getenv("ZHIZAI_OAUTH_URL")); v != "" {
 		return v
 	}
@@ -151,6 +172,9 @@ func ResolveOAuthBaseURL(cfg *Config) string {
 
 // ActiveEnvName reports which named env is in effect when no absolute URL override is set.
 func ActiveEnvName(cfg *Config) string {
+	if !AllowEnvSwitch() {
+		return EnvProd
+	}
 	if strings.TrimSpace(os.Getenv("ZHIZAI_API_URL")) != "" || strings.TrimSpace(os.Getenv("ZHIZAI_OAUTH_URL")) != "" {
 		return "custom"
 	}

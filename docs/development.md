@@ -18,8 +18,18 @@
 | CI | GitHub Actions：多平台构建 → Release → `npm publish` |
 | AI 接入 | `skills/` 原子 Skill + `zhizai setup` |
 
-服务基址集中在 `internal/config/endpoints.go` 的 `EnvPresets`（`dev` / `test` / `prod`，含业务与 OAuth 基址）。  
-默认 `DefaultEnv = dev`（lingxi）；可用 `ZHIZAI_ENV=test` 切到内网测试机。详见用户 README「服务环境」。
+服务基址集中在 `internal/config/endpoints.go` 的 `EnvPresets`（`dev` / `test` / `prod`）。
+
+**发布包默认锁定生产环境**，忽略 `ZHIZAI_ENV` / `api_url` 等切换项。  
+本地开发需显式打开开关后再切环境：
+
+```bash
+export ZHIZAI_DEV=1
+export ZHIZAI_ENV=test   # 或 dev / prod
+# 也可：
+# export ZHIZAI_API_URL=...
+# export ZHIZAI_OAUTH_URL=...
+```
 
 ---
 
