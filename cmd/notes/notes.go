@@ -39,6 +39,7 @@ func NewNotesCmd() *cobra.Command {
   zhizai notes --title 会议 -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := client.New()
+			fmt.Fprintf(cmd.ErrOrStderr(), "请求接口: %s\n", c.APIEndpoint("/note/queryNoteList"))
 			if all {
 				return streamAll(cmd, c, title, noteType)
 			}

@@ -125,3 +125,23 @@ func TestDoRetriesConnectionReset(t *testing.T) {
 		t.Fatalf("attempts = %d", attempts)
 	}
 }
+
+func TestNoteListLCDPBaseStripsDuplicateNote(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/app/note/queryNoteList", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"resultCode": "0",
+			"resultMsg":  "success",
+			"resultObject": map[string]interface{}{
+				"pageNum": 1, "pageSize": 1, "total": "0", "list": []any{},
+			},
+		})
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	c := NewWithOptions(server.URL+"/app/note", "test-key", server.Client())
+	if _, err := c.NoteList(NoteListParams{PageNum: 1, PageSize: 1}); err != nil {
+		t.Fatalf("LCDP-style base failed: %v", err)
+	}
+}

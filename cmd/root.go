@@ -111,12 +111,19 @@ func init() {
 func initConfig() {
 	cfg := config.Get()
 
+	// Process-level API Key override (does not rewrite disk unless auth login --api-key).
 	if apiKey != "" {
+		cfg.AuthMode = config.AuthModeAPIKey
 		cfg.APIKey = apiKey
+		cfg.AccessToken = ""
+		cfg.RefreshToken = ""
 		return
 	}
 
 	if envKey := os.Getenv("ZHIZAI_REC_API_KEY"); envKey != "" {
+		cfg.AuthMode = config.AuthModeAPIKey
 		cfg.APIKey = envKey
+		cfg.AccessToken = ""
+		cfg.RefreshToken = ""
 	}
 }

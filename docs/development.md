@@ -13,12 +13,13 @@
 | 语言 / CLI | Go 1.21+、[Cobra](https://github.com/spf13/cobra) |
 | 分发 | npm 包 `@zhizai/cli` + `postinstall` 拉取 GitHub Release 二进制 |
 | 命令入口 | `zhizai` / 短别名 `zz` |
-| 鉴权（当前） | API Key（`Authorization: <key>`，不加 Bearer） |
+| 鉴权（当前） | OAuth 设备授权（默认）+ API Key；OAuth 业务头 `X-OAuth2-Access-Token` |
 | 配置目录 | `~/.zhizai/config.json` |
 | CI | GitHub Actions：多平台构建 → Release → `npm publish` |
 | AI 接入 | `skills/` 原子 Skill + `zhizai setup` |
 
-OpenAPI 基址默认：`https://openapi.zzjilu.com/api/v1`，可用环境变量 `ZHIZAI_API_URL` 覆盖。
+服务基址集中在 `internal/config/endpoints.go` 的 `EnvPresets`（`dev` / `test` / `prod`，含业务与 OAuth 基址）。  
+默认 `DefaultEnv = dev`（lingxi）；可用 `ZHIZAI_ENV=test` 切到内网测试机。详见用户 README「服务环境」。
 
 ---
 
