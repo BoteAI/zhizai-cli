@@ -8,3 +8,7 @@ bin/zhizai.exe
 .DS_Store
 .npmrc
 *.tgz
+
+# Local-only docs (not published)
+docs/zhizai-cli-设备授权认证接口文档.md
+docs/superpowers/
