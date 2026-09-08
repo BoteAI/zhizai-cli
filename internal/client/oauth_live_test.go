@@ -12,8 +12,9 @@ func TestLiveLingxiDeviceAuthorize(t *testing.T) {
 		t.Skip("set ZHIZAI_LIVE=1 to hit lingxi")
 	}
 	os.Setenv("ZHIZAI_DEV", "1")
-	os.Setenv("ZHIZAI_ENV", "dev")
+	os.Setenv("ZHIZAI_ENV", "test")
 	os.Unsetenv("ZHIZAI_API_URL")
+	os.Unsetenv("ZHIZAI_OAUTH_URL")
 	config.ResetForTests()
 	c := New()
 	s, _, err := c.DeviceAuthorize("")

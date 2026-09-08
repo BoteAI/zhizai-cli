@@ -18,15 +18,30 @@
 | CI | GitHub Actions：多平台构建 → Release → `npm publish` |
 | AI 接入 | `skills/` 原子 Skill + `zhizai setup` |
 
-服务基址集中在 `internal/config/endpoints.go` 的 `EnvPresets`（`dev` / `test` / `prod`）。
+服务基址集中在 `internal/config/endpoints.go` 的 `EnvPresets`。
+
+### 环境对照
+
+OpenAPI（业务）与 OAuth2（设备授权）**分属不同 base**：OAuth 走 `.../server`，业务走 `.../api/v1`。
+
+| 环境 | `ZHIZAI_ENV` | 官网 | OAuth base | OpenAPI base |
+|------|--------------|------|------------|--------------|
+| 测试 | `test`（`dev` / `lingxi` 别名） | https://lingxi.iwhalecloud.com/zzjl/ | `https://lingxi.iwhalecloud.com/zzjl/server` | `https://lingxi.iwhalecloud.com/zzjl/api/v1` |
+| 灰度 | `gray`（`staging` / `canary`） | https://www.zzjilu.com:9001/pc/home | `https://www.zzjilu.com:9001/server` | `https://www.zzjilu.com:9001/api/v1`（临时；`openapi.zzjilu.com:9001` 待开通） |
+| 生产 | `prod`（发布默认） | https://www.zzjilu.com/pc/home | `https://www.zzjilu.com/server` | `https://openapi.zzjilu.com/api/v1` |
+
+示例路径：
+
+- OAuth：`{OAuthBase}/oauth2/device/authorize`
+- 业务：`{APIBase}/note/queryNoteList`
 
 **发布包默认锁定生产环境**，忽略 `ZHIZAI_ENV` / `api_url` 等切换项。  
 本地开发需显式打开开关后再切环境：
 
 ```bash
 export ZHIZAI_DEV=1
-export ZHIZAI_ENV=test   # 或 dev / prod
-# 也可：
+export ZHIZAI_ENV=test   # 或 gray / prod
+# 也可分别覆盖：
 # export ZHIZAI_API_URL=...
 # export ZHIZAI_OAUTH_URL=...
 ```

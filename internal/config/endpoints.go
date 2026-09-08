@@ -10,9 +10,10 @@ const OAuthClientID = "zhizai_cli"
 
 // Environment names for ZHIZAI_ENV / config.env.
 const (
-	EnvDev  = "dev"
-	EnvTest = "test"
-	EnvProd = "prod"
+	EnvDev  = "dev"  // 兼容别名，解析为 test
+	EnvTest = "test" // 测试（lingxi）
+	EnvGray = "gray" // 灰度（:9001）
+	EnvProd = "prod" // 生产
 )
 
 // Auth modes stored in config.json.
@@ -23,15 +24,23 @@ const (
 
 // EnvEndpoints holds per-environment service bases.
 //
-// Production keeps a single OpenAPI root for both business and OAuth APIs.
-// Test/dev split hosts: business may be LCDP (.../app/note) or OpenAPI (.../api/v1),
-// while device OAuth lives under the zzjl server root.
+// OpenAPI（业务）与 OAuth2（设备授权）通常分属不同 base：
+//   - APIBase：.../api/v1  → /note/...
+//   - OAuthBase：.../server → /oauth2/...（网关会省略 app/note 前缀）
 type EnvEndpoints struct {
-	APIBase   string // business OpenAPI / LCDP root
-	OAuthBase string // OAuth2 token/authorize root (.../oauth2/...)
+	APIBase   string // business OpenAPI root
+	OAuthBase string // OAuth2 authorize/token root
+	SiteURL   string // portal home (文档 / 诊断展示用)
 }
 
 // EnvPresets maps env name → API and OAuth bases.
+//
+// 环境对照（与平台运维约定一致）：
+//
+//	| 环境 | 官网 | OAuth base | OpenAPI base |
+//	| test | https://lingxi.iwhalecloud.com/zzjl/ | .../zzjl/server | .../zzjl/api/v1 |
+//	| gray | https://www.zzjilu.com:9001/pc/home | ...:9001/server | ...:9001/api/v1 |
+//	| prod | https://www.zzjilu.com/pc/home | .../server | openapi.zzjilu.com/api/v1 |
 //
 // 快速切换（仅本地开发，需 export ZHIZAI_DEV=1）：
 //  1. 环境变量 ZHIZAI_API_URL / ZHIZAI_OAUTH_URL（完整覆盖）
@@ -43,15 +52,25 @@ type EnvEndpoints struct {
 var EnvPresets = map[string]EnvEndpoints{
 	EnvProd: {
 		APIBase:   "https://openapi.zzjilu.com/api/v1",
-		OAuthBase: "https://openapi.zzjilu.com/api/v1",
+		OAuthBase: "https://www.zzjilu.com/server",
+		SiteURL:   "https://www.zzjilu.com/pc/home",
 	},
-	EnvDev: {
-		APIBase:   "https://lingxi.iwhalecloud.com/LCDP-RECORD/api/v1",
-		OAuthBase: "https://lingxi.iwhalecloud.com/zzjl/server",
+	EnvGray: {
+		// openapi.zzjilu.com:9001/api/v1 暂未开通，临时走官网同域 api/v1。
+		APIBase:   "https://www.zzjilu.com:9001/api/v1",
+		OAuthBase: "https://www.zzjilu.com:9001/server",
+		SiteURL:   "https://www.zzjilu.com:9001/pc/home",
 	},
 	EnvTest: {
 		APIBase:   "https://lingxi.iwhalecloud.com/zzjl/api/v1",
 		OAuthBase: "https://lingxi.iwhalecloud.com/zzjl/server",
+		SiteURL:   "https://lingxi.iwhalecloud.com/zzjl/",
+	},
+	// dev：历史别名，与 test 相同（lingxi）。
+	EnvDev: {
+		APIBase:   "https://lingxi.iwhalecloud.com/zzjl/api/v1",
+		OAuthBase: "https://lingxi.iwhalecloud.com/zzjl/server",
+		SiteURL:   "https://lingxi.iwhalecloud.com/zzjl/",
 	},
 }
 
@@ -59,8 +78,9 @@ var EnvPresets = map[string]EnvEndpoints{
 // Prefer EnvPresets / ResolveAPIBaseURL for new code.
 var ServiceBaseURLs = map[string]string{
 	EnvProd: EnvPresets[EnvProd].APIBase,
-	EnvDev:  EnvPresets[EnvDev].APIBase,
+	EnvGray: EnvPresets[EnvGray].APIBase,
 	EnvTest: EnvPresets[EnvTest].APIBase,
+	EnvDev:  EnvPresets[EnvDev].APIBase,
 }
 
 // DefaultEnv is used when neither ZHIZAI_ENV nor config.env is set.
@@ -87,10 +107,12 @@ func NormalizeEnv(name string) string {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case EnvProd, "production":
 		return EnvProd
-	case EnvTest, "sit", "qa", "uat":
+	case EnvGray, "staging", "canary", "pre", "preprod", "灰度":
+		return EnvGray
+	case EnvTest, "sit", "qa", "uat", "lingxi":
 		return EnvTest
-	case EnvDev, "development", "develop", "lingxi":
-		return EnvDev
+	case EnvDev, "development", "develop":
+		return EnvTest
 	default:
 		return DefaultEnv
 	}
@@ -136,9 +158,10 @@ func ResolveAPIBaseURL(cfg *Config) string {
 // ResolveOAuthBaseURL returns the OAuth2 API base URL without trailing slash.
 //
 // When AllowEnvSwitch is false, always returns production OAuth base.
-// Otherwise priority: ZHIZAI_OAUTH_URL → config.oauth_url → named-env preset →
-// if only a custom api_url/ZHIZAI_API_URL is set, fall back to that API base
-// (single-base mode, matches production).
+// Otherwise priority: ZHIZAI_OAUTH_URL → config.oauth_url → named-env preset OAuthBase。
+//
+// 仅覆盖业务 API（ZHIZAI_API_URL / api_url）时，OAuth 仍走当前命名环境的 OAuthBase，
+// 因为各环境 OpenAPI 与 OAuth 分属不同主机。
 func ResolveOAuthBaseURL(cfg *Config) string {
 	if !AllowEnvSwitch() {
 		return trimBase(EnvPresets[EnvProd].OAuthBase)
@@ -152,22 +175,23 @@ func ResolveOAuthBaseURL(cfg *Config) string {
 		}
 	}
 
-	apiOverride := trimBase(os.Getenv("ZHIZAI_API_URL"))
-	if apiOverride == "" && cfg != nil {
-		apiOverride = trimBase(cfg.APIURL)
+	envName := resolveEnvName(cfg)
+	if ep, ok := EnvPresets[envName]; ok {
+		return trimBase(ep.OAuthBase)
 	}
+	return trimBase(EnvPresets[DefaultEnv].OAuthBase)
+}
 
-	// Named env without absolute URL override → use preset OAuth base.
-	if apiOverride == "" {
-		envName := resolveEnvName(cfg)
-		if ep, ok := EnvPresets[envName]; ok {
-			return trimBase(ep.OAuthBase)
-		}
-		return trimBase(EnvPresets[DefaultEnv].OAuthBase)
+// ResolveSiteURL returns the portal home URL for the active named env (empty if custom).
+func ResolveSiteURL(cfg *Config) string {
+	name := ActiveEnvName(cfg)
+	if name == "custom" {
+		return ""
 	}
-
-	// Custom API base only: keep OAuth on the same root (prod-compatible).
-	return apiOverride
+	if ep, ok := EnvPresets[name]; ok {
+		return trimBase(ep.SiteURL)
+	}
+	return trimBase(EnvPresets[DefaultEnv].SiteURL)
 }
 
 // ActiveEnvName reports which named env is in effect when no absolute URL override is set.

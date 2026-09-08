@@ -86,10 +86,14 @@ func (c *Client) DeviceAuthorize(scope string) (*DeviceAuthSession, string, erro
 	}
 	raw := env.Raw
 	if env.ResultCode != "0" {
+		msg := strings.TrimSpace(env.ResultMsg)
+		if msg == "" {
+			msg = "设备授权会话创建失败"
+		}
 		return nil, raw, &RequestError{
 			APIError: APIError{
 				Code:      env.ResultCode,
-				Message:   env.ResultMsg,
+				Message:   msg,
 				Reason:    "device_authorize_failed",
 				Retryable: false,
 			},
@@ -311,9 +315,34 @@ func (c *Client) postOAuthForm(path string, form url.Values) (*apiEnvelope, erro
 
 	var env apiEnvelope
 	if err := json.Unmarshal(raw, &env); err != nil {
-		return nil, fmt.Errorf("parsing OAuth response (HTTP %d): %w; body=%s", resp.StatusCode, err, truncate(string(raw), 200))
+		return nil, &RequestError{
+			APIError: APIError{
+				Code:      fmt.Sprintf("http_%d", resp.StatusCode),
+				Message:   fmt.Sprintf("OAuth 响应不是平台 JSON（%s）：%s", reqURL, truncate(string(raw), 160)),
+				Reason:    "oauth_bad_response",
+				Retryable: resp.StatusCode >= 500,
+			},
+			StatusCode: resp.StatusCode,
+		}
 	}
 	env.Raw = string(raw)
+
+	// Gateway/Spring 404 等：有 JSON 但没有 resultCode，不能当成业务失败吞掉。
+	if strings.TrimSpace(env.ResultCode) == "" {
+		msg := fmt.Sprintf("OAuth 接口不可用 HTTP %d（%s）", resp.StatusCode, reqURL)
+		if resp.StatusCode == http.StatusNotFound {
+			msg += "；当前 OAuth 基址可能未开通设备授权，请联系后端，或本地 ZHIZAI_DEV=1 ZHIZAI_ENV=test|gray 联调"
+		}
+		return nil, &RequestError{
+			APIError: APIError{
+				Code:      fmt.Sprintf("http_%d", resp.StatusCode),
+				Message:   msg,
+				Reason:    "oauth_endpoint_unavailable",
+				Retryable: false,
+			},
+			StatusCode: resp.StatusCode,
+		}
+	}
 	return &env, nil
 }
 

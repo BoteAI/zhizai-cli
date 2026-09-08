@@ -10,7 +10,7 @@ import (
 
 // Config holds the CLI configuration.
 type Config struct {
-	// Env selects a preset in EnvPresets (dev|test|prod). Ignored if APIURL / ZHIZAI_API_URL is set.
+	// Env selects a preset in EnvPresets (test|gray|prod；dev 为 test 别名)。Ignored if APIURL / ZHIZAI_API_URL is set.
 	Env string `json:"env,omitempty"`
 	// APIURL is an absolute business API base URL override.
 	APIURL string `json:"api_url,omitempty"`

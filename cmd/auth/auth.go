@@ -36,13 +36,15 @@ func NewAuthCmd() *cobra.Command {
 
 func newLoginCmd() *cobra.Command {
 	var key string
+	var noOpen bool
 
 	cmd := &cobra.Command{
 		Use:   "login",
 		Args:  cobra.NoArgs,
 		Short: "登录（网页设备授权）",
 		Long:  `通过 OAuth 2.0 设备授权登录：打开浏览器确认后，CLI 轮询获取 access_token。`,
-		Example: `  zhizai auth login`,
+		Example: `  zhizai auth login
+  zhizai auth login --no-open`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
 			printServiceEndpoint(out)
@@ -50,10 +52,11 @@ func newLoginCmd() *cobra.Command {
 			if cmd.Flags().Changed("api-key") {
 				return loginWithAPIKey(out, key)
 			}
-			return runDeviceFlow(out)
+			return runDeviceFlow(out, noOpen)
 		},
 	}
 
+	cmd.Flags().BoolVar(&noOpen, "no-open", false, "不自动打开浏览器；打印授权 URL 供宿主展示")
 	cmd.Flags().StringVar(&key, "api-key", "", "API Key（仅网页授权失败时的备用方式）")
 	_ = cmd.Flags().MarkHidden("api-key")
 	return cmd
@@ -113,7 +116,7 @@ func loginWithAPIKey(out io.Writer, key string) error {
 	return nil
 }
 
-func runDeviceFlow(out io.Writer) error {
+func runDeviceFlow(out io.Writer, noOpen bool) error {
 	c := client.New()
 	session, rawAuth, err := c.DeviceAuthorize("")
 	if err != nil {
@@ -131,18 +134,26 @@ func runDeviceFlow(out io.Writer) error {
 		openURL = session.VerificationURI
 	}
 
-	fmt.Fprintln(out)
-	fmt.Fprintf(out, "请在浏览器打开以下地址完成授权：\n\n  %s\n\n", openURL)
-	fmt.Fprintf(out, "确认码: %s\n\n", session.UserCode)
-	if openURL != "" {
-		openBrowser(openURL)
+	if noOpen {
+		// Machine-readable lines for WorkBuddy / headless hosts.
+		fmt.Fprintf(out, "[device_code] %s\n", session.UserCode)
+		fmt.Fprintf(out, "[verify_url]  %s\n", openURL)
+		fmt.Fprintf(out, "[expires_in]  %d\n", int(session.ExpiresIn))
+		fmt.Fprintf(out, "[interval]    %d\n", int(session.Interval))
 	} else {
-		fmt.Fprintf(out, "请手动打开 %s 并输入确认码 %s\n\n", session.VerificationURI, session.UserCode)
+		fmt.Fprintln(out)
+		fmt.Fprintf(out, "请在浏览器打开以下地址完成授权：\n\n  %s\n\n", openURL)
+		fmt.Fprintf(out, "确认码: %s\n\n", session.UserCode)
+		if openURL != "" {
+			openBrowser(openURL)
+		} else {
+			fmt.Fprintf(out, "请手动打开 %s 并输入确认码 %s\n\n", session.VerificationURI, session.UserCode)
+		}
+		fmt.Fprintf(out, "等待授权确认（最长约 %d 秒，每 %d 秒轮询一次）\n", int(session.ExpiresIn), int(session.Interval))
 	}
 
 	interval := time.Duration(session.Interval) * time.Second
 	deadline := time.Now().Add(time.Duration(session.ExpiresIn) * time.Second)
-	fmt.Fprintf(out, "等待授权确认（最长约 %d 秒，每 %d 秒轮询一次）\n", int(session.ExpiresIn), int(session.Interval))
 
 	// Spec: wait at least interval before first poll.
 	time.Sleep(interval)
@@ -183,17 +194,21 @@ func runDeviceFlow(out io.Writer) error {
 				return wrapAuthFailure(fmt.Errorf("saving tokens: %w", err))
 			}
 			if err := client.New().Ping(); err != nil {
-				fmt.Fprintf(out, "⚠️ 令牌已保存，但探活失败: %v\n", err)
-				fmt.Fprintln(out, "✅ 网页授权登录成功（探活失败可稍后重试业务命令）。")
+				if !noOpen {
+					fmt.Fprintf(out, "⚠️ 令牌已保存，但探活失败: %v\n", err)
+					fmt.Fprintln(out, "✅ 网页授权登录成功（探活失败可稍后重试业务命令）。")
+				}
 				return nil
 			}
-			fmt.Fprintln(out, "✅ 网页授权登录成功。")
+			if !noOpen {
+				fmt.Fprintln(out, "✅ 网页授权登录成功。")
+			}
 			return nil
 		}
 
 		if config.AllowEnvSwitch() {
 			fmt.Fprintf(out, "[oauth] 状态=%s，继续等待...\n", pending)
-		} else {
+		} else if !noOpen {
 			fmt.Fprint(out, ".")
 		}
 		wait := interval
@@ -203,7 +218,9 @@ func runDeviceFlow(out io.Writer) error {
 		time.Sleep(wait)
 	}
 
-	fmt.Fprintln(out)
+	if !noOpen {
+		fmt.Fprintln(out)
+	}
 	return wrapAuthFailure(fmt.Errorf("授权超时，请重新运行 zhizai auth login"))
 }
 

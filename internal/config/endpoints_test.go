@@ -47,6 +47,12 @@ func TestResolveAPIBaseURL_Presets(t *testing.T) {
 		t.Fatalf("prod env = %q", got)
 	}
 
+	t.Setenv("ZHIZAI_ENV", "gray")
+	got = ResolveAPIBaseURL(&Config{})
+	if got != EnvPresets[EnvGray].APIBase {
+		t.Fatalf("gray env = %q, want %q", got, EnvPresets[EnvGray].APIBase)
+	}
+
 	t.Setenv("ZHIZAI_ENV", "dev")
 	got = ResolveAPIBaseURL(&Config{APIURL: "https://custom.example/api"})
 	if got != "https://custom.example/api" {
@@ -71,7 +77,10 @@ func TestResolveOAuthBaseURL(t *testing.T) {
 	t.Setenv("ZHIZAI_ENV", "prod")
 	got = ResolveOAuthBaseURL(&Config{})
 	if got != EnvPresets[EnvProd].OAuthBase {
-		t.Fatalf("prod oauth = %q", got)
+		t.Fatalf("prod oauth = %q, want %q", got, EnvPresets[EnvProd].OAuthBase)
+	}
+	if got != "https://www.zzjilu.com/server" {
+		t.Fatalf("prod oauth must be www.zzjilu.com/server, got %q", got)
 	}
 
 	t.Setenv("ZHIZAI_ENV", "test")
@@ -80,12 +89,18 @@ func TestResolveOAuthBaseURL(t *testing.T) {
 		t.Fatalf("test oauth = %q, want %q", got, EnvPresets[EnvTest].OAuthBase)
 	}
 
-	// Custom API only → OAuth falls back to same base.
-	t.Setenv("ZHIZAI_ENV", "")
+	t.Setenv("ZHIZAI_ENV", "gray")
+	got = ResolveOAuthBaseURL(&Config{})
+	if got != EnvPresets[EnvGray].OAuthBase {
+		t.Fatalf("gray oauth = %q, want %q", got, EnvPresets[EnvGray].OAuthBase)
+	}
+
+	// Custom API only → OAuth still follows named env (split hosts).
+	t.Setenv("ZHIZAI_ENV", "test")
 	t.Setenv("ZHIZAI_API_URL", "https://custom.example/api/v1")
 	got = ResolveOAuthBaseURL(&Config{})
-	if got != "https://custom.example/api/v1" {
-		t.Fatalf("custom api-only oauth fallback = %q", got)
+	if got != EnvPresets[EnvTest].OAuthBase {
+		t.Fatalf("api-only override should keep named-env oauth, got %q", got)
 	}
 
 	t.Setenv("ZHIZAI_OAUTH_URL", "https://oauth.example/server/")
@@ -96,8 +111,8 @@ func TestResolveOAuthBaseURL(t *testing.T) {
 }
 
 func TestNormalizeEnv(t *testing.T) {
-	if NormalizeEnv("lingxi") != EnvDev {
-		t.Fatal("lingxi should map to dev")
+	if NormalizeEnv("lingxi") != EnvTest {
+		t.Fatal("lingxi should map to test")
 	}
 	if NormalizeEnv("production") != EnvProd {
 		t.Fatal("production should map to prod")
@@ -107,6 +122,15 @@ func TestNormalizeEnv(t *testing.T) {
 	}
 	if NormalizeEnv("sit") != EnvTest {
 		t.Fatal("sit should map to test")
+	}
+	if NormalizeEnv("gray") != EnvGray {
+		t.Fatal("gray should map to gray")
+	}
+	if NormalizeEnv("staging") != EnvGray {
+		t.Fatal("staging should map to gray")
+	}
+	if NormalizeEnv("dev") != EnvTest {
+		t.Fatal("dev should alias to test")
 	}
 
 	enableDevSwitch(t)
@@ -127,9 +151,9 @@ func TestJoinAPIURL(t *testing.T) {
 			"https://openapi.zzjilu.com/api/v1/note/queryNoteList",
 		},
 		{
-			"https://lingxi.iwhalecloud.com/LCDP-RECORD/api/v1",
-			"/note/createNote",
-			"https://lingxi.iwhalecloud.com/LCDP-RECORD/api/v1/note/createNote",
+			"https://www.zzjilu.com:9001/api/v1",
+			"/note/queryNoteList",
+			"https://www.zzjilu.com:9001/api/v1/note/queryNoteList",
 		},
 		{
 			"https://lingxi.iwhalecloud.com/zzjl/api/v1",
@@ -162,8 +186,14 @@ func TestJoinOAuthURL(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 
-	got = JoinOAuthURL("https://openapi.zzjilu.com/api/v1/", "oauth2/token")
-	want = "https://openapi.zzjilu.com/api/v1/oauth2/token"
+	got = JoinOAuthURL("https://www.zzjilu.com/server/", "oauth2/token")
+	want = "https://www.zzjilu.com/server/oauth2/token"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+
+	got = JoinOAuthURL("https://www.zzjilu.com:9001/server", "/oauth2/device/authorize")
+	want = "https://www.zzjilu.com:9001/server/oauth2/device/authorize"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
@@ -175,5 +205,13 @@ func TestActiveEnvName_CustomWhenOAuthOverride(t *testing.T) {
 	t.Setenv("ZHIZAI_ENV", "prod")
 	if ActiveEnvName(&Config{}) != "custom" {
 		t.Fatal("oauth override should mark env custom")
+	}
+}
+
+func TestResolveSiteURL(t *testing.T) {
+	enableDevSwitch(t)
+	t.Setenv("ZHIZAI_ENV", "gray")
+	if got := ResolveSiteURL(&Config{}); got != "https://www.zzjilu.com:9001/pc/home" {
+		t.Fatalf("gray site = %q", got)
 	}
 }

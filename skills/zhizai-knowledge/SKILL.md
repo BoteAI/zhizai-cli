@@ -7,6 +7,10 @@ description: 查询和管理智在记录笔记集。
 
 | 意图 | 命令 |
 |---|---|
-| 笔记集操作 | `zhizai knowledge -o json` |
+| 我创建的笔记集 | `zhizai knowledge list -o json` |
+| 我收到的笔记集 | `zhizai knowledge list --received -o json` |
+| 笔记集详情 | `zhizai knowledge get <id> -o json` |
+| 集内笔记 | `zhizai knowledge notes <id> -o json` |
+| 新建笔记集 | `zhizai knowledge create --name <名称>`（后端待开放） |
 
 字段说明见 `skills/zhiji-open-platform/references/knowledge.md`。

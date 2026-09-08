@@ -109,6 +109,9 @@ zhizai setup
 | `zhizai version` | 显示版本 |
 | `zhizai notes [--limit\|--page\|--all]` | 笔记列表 |
 | `zhizai note get <id> [--field ...]` | 笔记详情 |
+| `zhizai knowledge list [--received]` | 笔记集列表（我创建的 / 收到的） |
+| `zhizai knowledge get <id>` | 笔记集详情 |
+| `zhizai knowledge notes <id>` | 笔记集内笔记 |
 | `zhizai setup [--dry-run]` | 为本机 AI 安装原子 Skill 并引导授权 |
 
 ### 规划中
@@ -116,10 +119,10 @@ zhizai setup
 | 命令 | 说明 |
 |------|------|
 | `zhizai note create\|update\|delete\|status` | 笔记写入与状态 |
+| `zhizai knowledge create` | 新建笔记集（后端接口待开放） |
 | `zhizai file upload` | 文件上传 |
 | `zhizai ask "<问题>"` | 基于笔记的动态模版问答 / 总结 |
 | `zhizai scene` | 场景与知识卡 |
-| `zhizai knowledge` | 笔记集 |
 | `zhizai team` | 团队与成员 |
 | `zhizai msg` | 消息与录音卡 |
 | `zhizai update` | 升级 CLI 并同步 Skill |
@@ -153,6 +156,8 @@ zhizai setup
 ### 鉴权说明
 
 默认使用 **OAuth 设备授权**：`zhizai auth login` → 浏览器确认 → 业务请求头 `X-OAuth2-Access-Token: Bearer …`。
+
+无头 / 连接器场景使用 `zhizai auth login --no-open`：不打开系统浏览器，打印 `[verify_url]` / `[device_code]` / `[expires_in]` / `[interval]`，后台继续轮询直至授权完成。
 
 OAuth 过期时 CLI 会自动用 `refresh_token` 刷新；也可手动 `zhizai auth refresh`。
 
