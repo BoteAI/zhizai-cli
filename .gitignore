@@ -3,6 +3,7 @@ zhizai-cli.exe
 dist/
 bin/zhizai
 bin/zhizai.exe
+bin/zhizai-dev
 *.test
 *.out
 .DS_Store
@@ -12,3 +13,5 @@ bin/zhizai.exe
 # Local-only docs (not published)
 docs/zhizai-cli-设备授权认证接口文档.md
 docs/superpowers/
+docs/github-issue-*.md
+docs/open-api-接口定义
