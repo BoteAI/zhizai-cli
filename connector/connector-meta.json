@@ -1,0 +1,26 @@
+{
+  "name": "智在记录",
+  "name_zh": "智在记录",
+  "name_en": "Zhizai Record",
+  "description": "Connect Zhizai Record via official CLI to search notes, manage knowledge sets, scenes, teams, and recording cards.",
+  "description_zh": "通过官方 CLI 连接智在记录，用自然语言查询笔记、管理笔记集、场景、团队与录音卡。",
+  "description_en": "Connect Zhizai Record via the official CLI to search notes and manage knowledge sets, scenes, teams, and recording cards.",
+  "source": "zhizai-cli-connector",
+  "type": "cli",
+  "version": "0.0.5",
+  "minWorkbuddyVersion": "5.0.0",
+  "examples_zh": [
+    "帮我查一下最近的会议笔记",
+    "把这段内容存成一条智在记录笔记",
+    "看看我有哪些笔记集",
+    "查一下录音卡还剩多少额度",
+    "退出智在记录登录"
+  ],
+  "examples_en": [
+    "Find my recent meeting notes in Zhizai",
+    "Save this as a Zhizai note",
+    "List my knowledge sets",
+    "Check remaining recording-card quota",
+    "Log out of Zhizai Record"
+  ]
+}

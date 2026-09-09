@@ -1,5 +1,6 @@
 ---
 name: zhizai-note
+version: 1.0.0
 description: 使用智在记录 CLI 查询、创建（文字）、更新和删除笔记，并查看处理进度。
 ---
 

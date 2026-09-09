@@ -1,5 +1,6 @@
 ---
 name: zhizai-msg
+version: 1.0.0
 description: 发送消息与查询录音卡使用情况。
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: zhizai-auth
+version: 1.0.0
 description: 安装和连接智在记录，完成网页授权登录、环境诊断与 CLI 升级。用户说安装、连接、登录、检查为什么不能用时使用。
 ---
 

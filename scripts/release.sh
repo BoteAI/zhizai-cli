@@ -112,6 +112,22 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
 fi
 TAG="v${VERSION}"
 
+# Keep WorkBuddy connector-meta version aligned with package.json.
+if [[ -f connector/connector-meta.json ]]; then
+  echo "==> Syncing connector/connector-meta.json version → ${VERSION}"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "+ node sync connector-meta.json version"
+  else
+    node -e "
+      const fs = require('fs');
+      const p = 'connector/connector-meta.json';
+      const m = JSON.parse(fs.readFileSync(p, 'utf8'));
+      m.version = process.argv[1];
+      fs.writeFileSync(p, JSON.stringify(m, null, 2) + '\n');
+    " "$VERSION"
+  fi
+fi
+
 if git rev-parse "$TAG" >/dev/null 2>&1; then
   echo "error: tag already exists locally: $TAG" >&2
   exit 1
@@ -128,11 +144,11 @@ run make test
 echo "==> Building"
 run make build
 
-if git diff --quiet -- package.json && git diff --cached --quiet -- package.json; then
+if git diff --quiet -- package.json connector/connector-meta.json && git diff --cached --quiet -- package.json connector/connector-meta.json; then
   :
 else
-  echo "==> Committing package.json version ${VERSION}"
-  run git add package.json
+  echo "==> Committing version ${VERSION} (package.json + connector-meta)"
+  run git add package.json connector/connector-meta.json
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "+ git commit -m \"chore: release ${TAG}\""
   else
@@ -149,6 +165,9 @@ HEAD_VER="$(git show HEAD:package.json | node -p "JSON.parse(require('fs').readF
 if [[ "$HEAD_VER" != "$VERSION" ]]; then
   echo "==> Committing package.json version ${VERSION} (was ${HEAD_VER} on HEAD)"
   run git add package.json
+  if [[ -f connector/connector-meta.json ]]; then
+    run git add connector/connector-meta.json
+  fi
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "+ git commit -m \"chore: release ${TAG}\""
   else

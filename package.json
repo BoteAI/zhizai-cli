@@ -21,7 +21,8 @@
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
     "release": "bash scripts/release.sh",
-    "publish:cli": "bash scripts/publish.sh"
+    "publish:cli": "bash scripts/publish.sh",
+    "connector:zip": "bash scripts/pack-connector.sh"
   },
   "files": [
     "bin/zhizai.js",

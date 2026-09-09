@@ -1,5 +1,6 @@
 ---
 name: zhizai-knowledge
+version: 1.0.0
 description: 查询和管理智在记录笔记集。
 ---
 

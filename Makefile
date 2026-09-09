@@ -3,7 +3,7 @@ VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "
 LDFLAGS    := -ldflags "-X github.com/BoteAI/zhizai-cli/internal/version.Version=$(VERSION) -s -w"
 BUILD_DIR  := dist
 
-.PHONY: build build-all clean test lint install release publish
+.PHONY: build build-all clean test lint install release publish connector-zip
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) .
@@ -57,3 +57,7 @@ release:
 # 一键发布（默认 patch，可确认）。例：make publish / make publish V=0.0.6 / make publish V=minor YES=1
 publish:
 	@bash scripts/publish.sh $(if $(filter 1 true yes YES,$(YES)),-y) $(V)
+
+# WorkBuddy 连接器 zip：connector/ + skills/ → dist/zhizai-cli-connector-<ver>.zip
+connector-zip:
+	@bash scripts/pack-connector.sh

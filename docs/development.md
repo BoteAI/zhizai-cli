@@ -63,7 +63,7 @@ export ZHIZAI_ENV=test   # 或 gray / prod
  internal/config              ~/.zhizai
  internal/output              table / 统一 JSON
  internal/platform            本机 AI 探测
- skills/                      Skill 源码（setup 安装）
+ skills/                      Skill 源码（setup 与连接器共用）
 ```
 
 ### 目录结构
@@ -79,11 +79,14 @@ zhizai-cli/
 │   ├── platform/             # 本机 AI 平台探测
 │   ├── ui/
 │   └── version/
-├── skills/                   # 原子 Skill + 开放平台参考
+├── skills/                   # 原子 Skill + 开放平台参考（连接器共用）
+├── connector/                # WorkBuddy 连接器元信息
 ├── bin/zhizai.js             # npm 启动器
 ├── scripts/
 │   ├── postinstall.js        # npm 安装后下载二进制
-│   └── release.sh            # 打 tag 触发发版
+│   ├── release.sh            # 打 tag 触发发版
+│   ├── publish.sh            # 一键发布 CLI
+│   └── pack-connector.sh     # 一键打连接器 zip
 ├── docs/                     # 开发文档（本文）
 └── .github/workflows/release.yml
 ```
@@ -97,7 +100,7 @@ zhizai-cli/
 | 输出 `internal/output` | Agent 可读的 `{success,data,error}` |
 | Skill | 意图路由到 CLI，不直接拼 OpenAPI |
 
-字段与接口细节以 `skills/zhiji-open-platform/references/` 为准。
+字段与接口细节以 `skills/zhizai-open-platform/references/` 为准。
 
 ---
 
@@ -152,10 +155,27 @@ make install
 
 ### 原理
 
-1. 推送符合 `v*` 的 git tag  
-2. GitHub Actions 交叉编译并上传 Release 资产（含 `checksums.txt`）  
-3. 同一 workflow 执行 `npm publish --access public`  
-4. 用户 `npm install -g @zhizai/cli` 时，`postinstall` 按版本从 Release 下载对应平台包  
+本机只负责「升版本 + 推 tag」；真正的二进制与 npm 发包由 GitHub Actions 完成。
+
+```text
+make publish / ./scripts/publish.sh
+        │
+        ▼
+  package.json 升版 → test/build → commit
+        │
+        ▼
+  push master + tag vX.Y.Z
+        │
+        ▼
+  GitHub Actions (.github/workflows/release.yml)
+        ├── 交叉编译多平台二进制
+        ├── 创建 GitHub Release（含 checksums）
+        └── npm publish @zhizai/cli@X.Y.Z
+        │
+        ▼
+  用户: npm install -g @zhizai/cli
+        └── postinstall 从 Release 拉对应平台包
+```
 
 **仓库与 Release 须公开**，否则 `postinstall` 下载会 404。
 
@@ -170,24 +190,34 @@ zhizai-cli_{version}_windows_amd64.zip
 
 | 项 | 说明 |
 |----|------|
+| 分支 | 在 `master` / `main`，工作区干净（未提交改动先 commit） |
+| 权限 | 对本仓库有 push 权限 |
 | npm 组织 | `@zhizai` 作用域有发布权限 |
 | GitHub Secret | `NPM_TOKEN`（Actions → Secrets） |
 | 本地 `.npmrc` | 仅本机调试用，**勿提交**（见 `.npmrc.example`） |
 
-### 发版命令
+### 一键发布（推荐）
 
 ```bash
-# 使用 package.json 当前版本打 tag 并推送
-make release
+# 默认 patch：0.0.5 → 0.0.6，会先询问确认
+make publish
 # 或
-npm run release
+./scripts/publish.sh
+npm run publish:cli
 
-# 升版本后再发（注意用 V=，不要用 VERSION=；VERSION 留给 go build ldflags）
-make release V=patch
-make release V=0.0.3
+# 跳过确认
+make publish YES=1
+./scripts/publish.sh -y
+
+# 指定版本 / minor / major
+make publish V=0.0.6
+make publish V=minor YES=1
+./scripts/publish.sh --dry-run          # 只演练，不推送
 ```
 
-脚本会：跑测试 → 构建 →（如有）提交版本变更 → 推送分支与 tag。  
+底层仍调用 `scripts/release.sh`（也可用 `make release V=patch`）。
+
+脚本会：跑测试 → 构建 → 提交版本变更 → 推送分支与 tag。  
 进度：https://github.com/BoteAI/zhizai-cli/actions  
 
 发版后验证：
@@ -197,6 +227,27 @@ npm view @zhizai/cli version
 npm install -g @zhizai/cli@latest
 zhizai --version
 ```
+
+---
+
+## WorkBuddy 连接器
+
+连接器元信息在 `connector/`，Skill **与 CLI 共用** `skills/`（每个 `SKILL.md` 需含 `version` frontmatter）。
+
+`connector-meta.json` 的 `version` 与根目录 `package.json` **对齐**；`make release` / `pack-connector` 会自动同步。
+
+### 一键打 zip
+
+```bash
+make connector-zip
+# 或
+npm run connector:zip
+./scripts/pack-connector.sh
+```
+
+产物：`dist/zhizai-cli-connector-<version>.zip`（顶层目录名 `zhizai-cli-connector/`），可直接提交 WorkBuddy。
+
+说明见 `connector/README.md`。
 
 ---
 

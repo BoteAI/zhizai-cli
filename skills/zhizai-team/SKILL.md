@@ -1,5 +1,6 @@
 ---
 name: zhizai-team
+version: 1.0.0
 description: 管理智在记录团队与成员。
 ---
 
