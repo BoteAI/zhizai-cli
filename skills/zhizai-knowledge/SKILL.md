@@ -13,4 +13,4 @@ description: 查询和管理智在记录笔记集。
 | 集内笔记 | `zhizai knowledge notes <id> -o json` |
 | 新建笔记集 | `zhizai knowledge create --name <名称>`（后端待开放） |
 
-字段说明见 `skills/zhiji-open-platform/references/knowledge.md`。
+字段说明见 `skills/zhizai-open-platform/references/knowledge.md`。

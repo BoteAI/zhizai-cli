@@ -9,4 +9,4 @@ description: 发送消息与查询录音卡使用情况。
 |---|---|
 | 消息与录音卡 | `zhizai msg -o json` |
 
-字段说明见 `skills/zhiji-open-platform/references/msg-device.md`。
+字段说明见 `skills/zhizai-open-platform/references/msg-device.md`。

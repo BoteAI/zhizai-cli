@@ -73,6 +73,80 @@ func TestNoteListAndGet(t *testing.T) {
 	}
 }
 
+func TestNoteCreateUpdateDeleteStatus(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/note/createNote", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body["noteType"] != "text" {
+			t.Fatalf("noteType=%v", body["noteType"])
+		}
+		tc, _ := body["textContent"].(map[string]interface{})
+		if tc["content"] != "hello" {
+			t.Fatalf("textContent=%v", tc)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"resultCode": "0",
+			"resultMsg":  "success",
+			"resultObject": map[string]interface{}{
+				"id": "9001", "title": "t", "note_type": "text", "note_state": "pending",
+			},
+		})
+	})
+	mux.HandleFunc("/note/updateNoteInfo", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body["noteId"] != "9001" || body["title"] != "新标题" {
+			t.Fatalf("update body=%v", body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"resultCode": "0", "resultMsg": "success", "resultObject": nil,
+		})
+	})
+	mux.HandleFunc("/note/deleteNote", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("noteId") != "9001" {
+			t.Fatalf("noteId=%q", r.URL.Query().Get("noteId"))
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"resultCode": "0", "resultMsg": "success", "resultObject": nil,
+		})
+	})
+	mux.HandleFunc("/note/queryNoteStatus", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"resultCode": "0",
+			"resultMsg":  "success",
+			"resultObject": map[string]interface{}{
+				"noteState": "completed",
+			},
+		})
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	c := NewWithOptions(server.URL, "test-key", server.Client())
+
+	created, err := c.NoteCreate(NoteCreateParams{
+		NoteType:    "text",
+		TextContent: &NoteTextContent{Title: "t", Content: "hello"},
+	})
+	if err != nil || created.ID != "9001" {
+		t.Fatalf("create: %+v err=%v", created, err)
+	}
+	if err := c.NoteUpdate(NoteUpdateParams{NoteID: "9001", Title: "新标题"}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := c.NoteStatus("9001")
+	if err != nil || st.NoteState != "completed" {
+		t.Fatalf("status=%+v err=%v", st, err)
+	}
+	if err := c.NoteDelete("9001"); err != nil {
+		t.Fatal(err)
+	}
+	if NoteStateLabel("completed") != "已完成" {
+		t.Fatal("NoteStateLabel")
+	}
+}
+
 func TestPingUnauthorized(t *testing.T) {
 	c := NewWithOptions("http://example.invalid", "", nil)
 	if err := c.Ping(); err == nil {

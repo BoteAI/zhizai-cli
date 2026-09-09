@@ -3,7 +3,7 @@ VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "
 LDFLAGS    := -ldflags "-X github.com/BoteAI/zhizai-cli/internal/version.Version=$(VERSION) -s -w"
 BUILD_DIR  := dist
 
-.PHONY: build build-all clean test lint install release
+.PHONY: build build-all clean test lint install release publish
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) .
@@ -53,3 +53,7 @@ dev-link: build
 # Do not use VERSION= here — VERSION is reserved for go build ldflags.
 release:
 	@bash scripts/release.sh $(V)
+
+# 一键发布（默认 patch，可确认）。例：make publish / make publish V=0.0.6 / make publish V=minor YES=1
+publish:
+	@bash scripts/publish.sh $(if $(filter 1 true yes YES,$(YES)),-y) $(V)

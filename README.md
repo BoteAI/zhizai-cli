@@ -109,6 +109,10 @@ zhizai setup
 | `zhizai version` | 显示版本 |
 | `zhizai notes [--limit\|--page\|--all]` | 笔记列表 |
 | `zhizai note get <id> [--field ...]` | 笔记详情 |
+| `zhizai note create --title/--content` | 创建文字笔记 |
+| `zhizai note update <id> --title/--abstract/--summary` | 更新笔记 |
+| `zhizai note delete <id> --yes` | 删除笔记 |
+| `zhizai note status <id>` | 笔记处理进度 |
 | `zhizai knowledge list [--received]` | 笔记集列表（我创建的 / 收到的） |
 | `zhizai knowledge get <id>` | 笔记集详情 |
 | `zhizai knowledge notes <id>` | 笔记集内笔记 |
@@ -118,9 +122,8 @@ zhizai setup
 
 | 命令 | 说明 |
 |------|------|
-| `zhizai note create\|update\|delete\|status` | 笔记写入与状态 |
 | `zhizai knowledge create` | 新建笔记集（后端接口待开放） |
-| `zhizai file upload` | 文件上传 |
+| `zhizai file upload` | 文件上传（录音/文档等笔记类型依赖此项） |
 | `zhizai ask "<问题>"` | 基于笔记的动态模版问答 / 总结 |
 | `zhizai scene` | 场景与知识卡 |
 | `zhizai team` | 团队与成员 |
@@ -172,13 +175,13 @@ OAuth 过期时 CLI 会自动用 `refresh_token` 刷新；也可手动 `zhizai a
 | Skill | 职责 |
 |-------|------|
 | `zhizai-auth` | 安装、登录、诊断、升级 |
-| `zhizai-note` | 笔记 CRUD、上传、问答 |
+| `zhizai-note` | 笔记列表、详情、文字创建、更新、删除、进度 |
 | `zhizai-knowledge` | 笔记集 |
 | `zhizai-scene` | 场景与知识卡 |
 | `zhizai-team` | 团队与成员 |
 | `zhizai-msg` | 消息与录音卡 |
 
-另保留聚合 Skill `zhiji-open-platform`（含完整 OpenAPI 参考文档）。
+另保留聚合 Skill `zhizai-open-platform`（含完整 OpenAPI 参考文档）。
 
 原则：**Skill 只做意图路由，真实请求一律走 `zhizai` CLI**，不自行拼 OpenAPI。
 

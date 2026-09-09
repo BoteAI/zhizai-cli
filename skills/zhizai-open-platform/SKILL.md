@@ -1,5 +1,5 @@
 ---
-name: zhiji-open-platform
+name: zhizai-open-platform
 version: 1.0.0
 description: |
   通过智在记录开放 API 连接笔记数据：鉴权、检索/问答/总结（动态模版路由）、笔记 CRUD、场景与知识卡、笔记集、团队、消息与录音卡。

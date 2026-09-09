@@ -20,7 +20,8 @@
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
-    "release": "bash scripts/release.sh"
+    "release": "bash scripts/release.sh",
+    "publish:cli": "bash scripts/publish.sh"
   },
   "files": [
     "bin/zhizai.js",

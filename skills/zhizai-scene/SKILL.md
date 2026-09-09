@@ -9,4 +9,4 @@ description: 查询智在记录总结场景与知识卡。
 |---|---|
 | 场景与知识卡 | `zhizai scene -o json` |
 
-字段说明见 `skills/zhiji-open-platform/references/scene.md`。
+字段说明见 `skills/zhizai-open-platform/references/scene.md`。
