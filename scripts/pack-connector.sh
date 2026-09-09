@@ -32,7 +32,7 @@ fi
 CONNECTOR_DIR="$ROOT/connector"
 SKILLS_DIR="$ROOT/skills"
 DIST_DIR="$ROOT/dist"
-STAGING_NAME="zhizai-cli-connector"
+STAGING_NAME="zhizai"
 STAGING="$DIST_DIR/.staging-$STAGING_NAME"
 ZIP_NAME="${STAGING_NAME}-${VERSION}.zip"
 ZIP_PATH="$DIST_DIR/$ZIP_NAME"

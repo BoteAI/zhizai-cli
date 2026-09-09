@@ -11,7 +11,5 @@ bin/zhizai-dev
 *.tgz
 
 # Local-only docs (not published)
-docs/zhizai-cli-设备授权认证接口文档.md
-docs/superpowers/
-docs/github-issue-*.md
-docs/open-api-接口定义
+docs/
+!docs/development.md
