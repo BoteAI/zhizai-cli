@@ -10,17 +10,17 @@
   "version": "0.0.6",
   "minWorkbuddyVersion": "5.0.0",
   "examples_zh": [
-    "帮我查一下最近的会议笔记",
-    "把这段内容存成一条智在记录笔记",
-    "看看我有哪些笔记集",
-    "查一下录音卡还剩多少额度",
-    "退出智在记录登录"
+    "帮我生成周报",
+    "总结这个笔记的内容",
+    "帮我提取本月所有客户的拜访纪要？ ",
+    "请对我近一周的面试记录，做一个评价分析总结",
+    "帮我汇总近一个月的所有待办事项，并标注负责人和截止时间"
   ],
   "examples_en": [
-    "Find my recent meeting notes in Zhizai",
-    "Save this as a Zhizai note",
-    "List my knowledge sets",
-    "Check remaining recording-card quota",
-    "Log out of Zhizai Record"
+    "Help me generate a weekly report",
+    "Summarize the content of this note",
+    "Help me extract all customer visit minutes from this month?",
+    "Please review and summarize my interview records from the past week",
+    "Help me summarize all to-do items from the past month, and mark the owners and deadlines"
   ]
 }
