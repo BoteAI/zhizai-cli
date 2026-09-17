@@ -82,12 +82,17 @@ zhizai note get <id> --field summary
 
 ### 4. 接入本机 AI
 
+CLI 首次安装请用 npm（见上文「安装」）。`setup` 负责同步 Skills 与授权，**不会**在 CLI 已可用时重复 npm 重装。
+
 ```bash
 # 预览将执行的操作
 zhizai setup --dry-run -o json
 
-# 正式安装 Skill
+# 同步 Skill 并引导授权（CLI 已就绪时跳过重装）
 zhizai setup
+
+# 升级或修复 CLI 二进制（显式触发 npm 重装）
+zhizai setup --force-cli-install
 ```
 
 `setup` 会把原子 Skill 安装到 Cursor、Claude Code、Codex 等本机 AI 环境，并引导完成授权。
@@ -116,7 +121,7 @@ zhizai setup
 | `zhizai knowledge list [--received]` | 笔记集列表（我创建的 / 收到的） |
 | `zhizai knowledge get <id>` | 笔记集详情 |
 | `zhizai knowledge notes <id>` | 笔记集内笔记 |
-| `zhizai setup [--dry-run]` | 为本机 AI 安装原子 Skill 并引导授权 |
+| `zhizai setup [--dry-run] [--force-cli-install]` | 同步原子 Skill 并引导授权；CLI 已就绪时跳过重装 |
 
 ### 规划中
 

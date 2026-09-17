@@ -2,14 +2,17 @@ package setup
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/BoteAI/zhizai-cli/internal/config"
 	"github.com/BoteAI/zhizai-cli/internal/output"
@@ -68,6 +71,7 @@ type result struct {
 	Success         bool             `json:"success"`
 	Targets         []string         `json:"targets"`
 	InstalledCLI    bool             `json:"installed_cli"`
+	CLIReady        bool             `json:"cli_ready"`
 	InstalledSkills bool             `json:"installed_skills"`
 	RestartRequired []string         `json:"restart_required,omitempty"`
 	Authenticated   bool             `json:"authenticated"`
@@ -120,11 +124,82 @@ func configureInstallProcess(command *exec.Cmd, outFormat string, stdout, stderr
 	}
 }
 
-// NewSetupCmd installs bundled atomic skills into supported local AI hosts.
+// parseVersionOutput extracts the semver from `zhizai version <ver>` stdout.
+func parseVersionOutput(out string) (string, bool) {
+	out = strings.TrimSpace(out)
+	const prefix = "zhizai version "
+	if !strings.HasPrefix(out, prefix) {
+		return "", false
+	}
+	ver := strings.TrimSpace(strings.TrimPrefix(out, prefix))
+	if ver == "" || strings.ContainsAny(ver, " \t\n") {
+		return "", false
+	}
+	return strings.TrimPrefix(ver, "v"), true
+}
+
+func nativeBinaryPath() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	execPath, err = filepath.EvalSymlinks(execPath)
+	if err != nil {
+		execPath, _ = os.Executable()
+	}
+	base := filepath.Base(execPath)
+	if base == "zhizai" || base == "zhizai.exe" {
+		return execPath, nil
+	}
+	dir := filepath.Dir(execPath)
+	name := "zhizai"
+	if runtime.GOOS == "windows" {
+		name = "zhizai.exe"
+	}
+	return filepath.Join(dir, name), nil
+}
+
+func resolveNativeBinaryForProbe() (string, error) {
+	if len(os.Args) > 0 && os.Args[0] != "" {
+		name := "zhizai"
+		if runtime.GOOS == "windows" {
+			name = "zhizai.exe"
+		}
+		candidate := filepath.Join(filepath.Dir(os.Args[0]), name)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+	}
+	return nativeBinaryPath()
+}
+
+func runCLIVersion(bin string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, "version")
+	out, err := cmd.Output()
+	return string(out), err
+}
+
+func probeCLIReady(bin string, runVersion func(string) (string, error)) (bool, string) {
+	if bin == "" {
+		return false, ""
+	}
+	if _, err := os.Stat(bin); err != nil {
+		return false, ""
+	}
+	out, err := runVersion(bin)
+	if err != nil {
+		return false, ""
+	}
+	ver, ok := parseVersionOutput(out)
+	return ok, ver
+}
+
 func NewSetupCmd() *cobra.Command {
 	var targets []string
 	var scope, source string
-	var skipAuth, dryRun, skipCLIInstall bool
+	var skipAuth, dryRun, skipCLIInstall, forceCLIInstall bool
 
 	cmd := &cobra.Command{
 		Use:   "setup",
@@ -142,32 +217,47 @@ func NewSetupCmd() *cobra.Command {
 				return err
 			}
 			outFormat := output.Format()
+
+			cliReady := false
+			cliVersion := ""
+			if bin, err := resolveNativeBinaryForProbe(); err == nil {
+				cliReady, cliVersion = probeCLIReady(bin, runCLIVersion)
+			}
+
+			installCLI := shouldInstallCLI(forceCLIInstall, skipCLIInstall, cliReady)
+
 			if dryRun {
 				platforms, actions := setupPlatformResults(resolved, false)
 				return writeResult(cmd, outFormat, result{
 					Success:       true,
 					Targets:       resolved,
+					CLIReady:      cliReady,
 					Authenticated: config.Get().IsLoggedIn() || os.Getenv("ZHIZAI_REC_API_KEY") != "",
 					Platforms:     platforms,
 					NextActions:   actions,
-					Next:          setupPlan(resolved, scope),
+					Next:          setupPlan(resolved, scope, skipCLIInstall, forceCLIInstall, cliReady),
 				})
 			}
 
 			writeProgress(cmd, outFormat, setupBanner)
-			if skipCLIInstall {
-				writeProgress(cmd, outFormat, "\n正在同步智在记录 Skills，请稍候…")
-			} else {
+			switch {
+			case installCLI:
 				writeProgress(cmd, outFormat, "\n正在安装智在记录，请稍候…")
+			case skipCLIInstall:
+				writeProgress(cmd, outFormat, "\n正在同步智在记录 Skills，请稍候…")
+			default:
+				writeProgress(cmd, outFormat, fmt.Sprintf("\nCLI 已就绪（v%s），跳过安装", cliVersion))
+				writeProgress(cmd, outFormat, "正在同步智在记录 Skills，请稍候…")
 			}
 
-			if !skipCLIInstall {
-				installCLI := exec.Command("npm", "install", "-g", cliPackage())
-				installCLI.Stdin = cmd.InOrStdin()
-				details, installErr := runInstaller(installCLI)
+			if installCLI {
+				installCmd := exec.Command("npm", "install", "-g", cliPackage())
+				installCmd.Stdin = cmd.InOrStdin()
+				details, installErr := runInstaller(installCmd)
 				if installErr != nil {
 					return installerError("安装命令行工具", installErr, details)
 				}
+				cliReady = true
 			}
 
 			localTargets := locallyManagedTargets(resolved)
@@ -224,7 +314,8 @@ func NewSetupCmd() *cobra.Command {
 			return writeResult(cmd, outFormat, result{
 				Success:         true,
 				Targets:         resolved,
-				InstalledCLI:    !skipCLIInstall,
+				InstalledCLI:    installCLI,
+				CLIReady:        cliReady || installCLI,
 				InstalledSkills: len(localTargets) > 0,
 				RestartRequired: restartRequired,
 				Authenticated:   authed,
@@ -241,12 +332,34 @@ func NewSetupCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&skipAuth, "skip-auth", false, "跳过首次授权")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "仅输出将执行的操作")
 	cmd.Flags().BoolVar(&skipCLIInstall, "skip-cli-install", false, "跳过 CLI 安装，仅同步 Skills")
-	_ = cmd.Flags().MarkHidden("skip-cli-install")
+	cmd.Flags().BoolVar(&forceCLIInstall, "force-cli-install", false, "强制重新安装 CLI（即使当前已可用）")
 	return cmd
 }
 
-func setupPlan(targets []string, scope string) string {
-	steps := []string{"npm install -g " + cliPackage()}
+func shouldInstallCLI(force, skip, ready bool) bool {
+	switch {
+	case force:
+		return true
+	case skip:
+		return false
+	case ready:
+		return false
+	default:
+		return true
+	}
+}
+
+func setupPlan(targets []string, scope string, skipCLI, forceCLI, cliReady bool) string {
+	steps := []string{}
+	switch {
+	case forceCLI:
+		steps = append(steps, "npm install -g "+cliPackage())
+	case skipCLI:
+	case cliReady:
+		steps = append(steps, "检测 CLI 已就绪，跳过 npm install")
+	default:
+		steps = append(steps, "检测 CLI；必要时 npm install -g "+cliPackage())
+	}
 	agents := standardAgentTargets(targets)
 	if len(agents) > 0 {
 		args := []string{"npx -y skills add <全局 @zhizai/cli 目录> -y"}
