@@ -12,4 +12,5 @@ bin/zhizai-dev
 
 # Local-only docs (not published)
 docs/
+scripts/restore-zhizai.sh
 !docs/development.md
