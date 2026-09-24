@@ -7,7 +7,7 @@
   "description_en": "Connect Zhizai Record via the official CLI to search notes and manage knowledge sets, scenes, teams, and recording cards.",
   "source": "zhizai",
   "type": "cli",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "minWorkbuddyVersion": "5.0.0",
   "examples_zh": [
     "帮我生成周报",
