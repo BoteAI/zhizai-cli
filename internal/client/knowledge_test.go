@@ -47,3 +47,24 @@ func TestCoerceKnowledgeID(t *testing.T) {
 		t.Fatalf("non-numeric -> %v", got)
 	}
 }
+
+func TestParseKnowledgeCatalogList(t *testing.T) {
+	list, err := parseKnowledgeCatalogList(json.RawMessage(`[
+		{"catalogId":"c1","catalogName":"A","parentCatalogId":"-1","detailTotal":"3"}
+	]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].CatalogID != "c1" || int(list[0].DetailTotal) != 3 {
+		t.Fatalf("%+v", list)
+	}
+
+	wrapped, err := parseKnowledgeCatalogList(json.RawMessage(`{"list":[{"catalogId":"c2","catalogName":"B"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wrapped) != 1 || wrapped[0].CatalogID != "c2" {
+		t.Fatalf("%+v", wrapped)
+	}
+}
+

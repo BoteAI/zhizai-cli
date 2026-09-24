@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
+
+// DefaultNoteWaitTimeout is used when NoteWait timeout <= 0.
+const DefaultNoteWaitTimeout = 10 * time.Minute
 
 // Note is a 智在记录 note item.
 type Note struct {
@@ -28,6 +32,7 @@ type Note struct {
 	Longitude    string          `json:"longitude,omitempty"`
 	RecEndTime   string          `json:"rec_end_time,omitempty"`
 	AccountNum   string          `json:"account_num,omitempty"`
+	ShortURL     string          `json:"short_url,omitempty"`
 }
 
 // NoteListData is the paginated note list payload.
@@ -56,6 +61,7 @@ type NoteListParams struct {
 	PageNum         int    `json:"pageNum,omitempty"`
 	PageSize        int    `json:"pageSize,omitempty"`
 	WithContent     string `json:"withContent,omitempty"`
+	WithShortUrl    string `json:"withShortUrl,omitempty"`
 }
 
 // NoteTextContent is textContent for createNote.
@@ -64,11 +70,56 @@ type NoteTextContent struct {
 	Content string `json:"content,omitempty"`
 }
 
-// NoteCreateParams matches POST /note/createNote (phase-1: text notes).
+// NoteVoiceContent is voiceContent for createNote.
+type NoteVoiceContent struct {
+	VoiceFileID     string   `json:"voiceFileId,omitempty"`
+	Title           string   `json:"title,omitempty"`
+	Text            string   `json:"text,omitempty"`
+	RecStartTime    string   `json:"recStartTime,omitempty"`
+	RecEndTime      string   `json:"recEndTime,omitempty"`
+	Duration        string   `json:"duration,omitempty"`
+	ImageFileIds    []string `json:"imageFileIds,omitempty"`
+	AppendNoteID    string   `json:"appendNoteId,omitempty"`
+	DeviceSN        string   `json:"deviceSn,omitempty"`
+	Latitude        string   `json:"latitude,omitempty"`
+	Longitude       string   `json:"longitude,omitempty"`
+	RecordingSource string   `json:"recordingSource,omitempty"`
+	KnowledgeID     string   `json:"knowledgeId,omitempty"`
+	DirectoryID     string   `json:"directoryId,omitempty"`
+}
+
+// NoteImageFile is one entry in imageContent.fileIds.
+type NoteImageFile struct {
+	FileID string `json:"fileId,omitempty"`
+	Remark string `json:"remark,omitempty"`
+}
+
+// NoteImageContent is imageContent for createNote.
+type NoteImageContent struct {
+	FileIds []NoteImageFile `json:"fileIds,omitempty"`
+}
+
+// NoteDocumentContent is documentContent for createNote.
+type NoteDocumentContent struct {
+	FileID   string `json:"fileId,omitempty"`
+	FileName string `json:"fileName,omitempty"`
+	Title    string `json:"title,omitempty"`
+}
+
+// NoteLinkContent is linkContent for createNote.
+type NoteLinkContent struct {
+	URL string `json:"url,omitempty"`
+}
+
+// NoteCreateParams matches POST /note/createNote.
 type NoteCreateParams struct {
-	NoteType    string           `json:"noteType"`
-	SceneID     interface{}      `json:"sceneId,omitempty"`
-	TextContent *NoteTextContent `json:"textContent,omitempty"`
+	NoteType        string               `json:"noteType"`
+	SceneID         interface{}          `json:"sceneId,omitempty"`
+	TextContent     *NoteTextContent     `json:"textContent,omitempty"`
+	VoiceContent    *NoteVoiceContent    `json:"voiceContent,omitempty"`
+	ImageContent    *NoteImageContent    `json:"imageContent,omitempty"`
+	DocumentContent *NoteDocumentContent `json:"documentContent,omitempty"`
+	LinkContent     *NoteLinkContent     `json:"linkContent,omitempty"`
 }
 
 // NoteUpdateParams matches POST /note/updateNoteInfo.
@@ -82,6 +133,17 @@ type NoteUpdateParams struct {
 // NoteStatus is GET /note/queryNoteStatus resultObject.
 type NoteStatus struct {
 	NoteState string `json:"noteState"`
+}
+
+// NoteGetOptions controls optional query params for note detail.
+type NoteGetOptions struct {
+	WithShortUrl string
+}
+
+// NoteAppendDetail is resultObject of GET /note/qryNoteDetailInfoAndAppend.
+type NoteAppendDetail struct {
+	QueryMainNoteInfo  *Note  `json:"queryMainNoteInfo"`
+	QueryRecordingNote []Note `json:"queryRecordingNote,omitempty"`
 }
 
 // NoteList queries notes with pagination.
@@ -105,7 +167,19 @@ func (c *Client) NoteList(params NoteListParams) (*NoteListData, error) {
 
 // NoteGet queries a single note by ID.
 func (c *Client) NoteGet(noteID string) (*Note, error) {
+	return c.NoteGetWithOptions(noteID, NoteGetOptions{})
+}
+
+// NoteGetWithOptions queries a single note with optional withShortUrl.
+func (c *Client) NoteGetWithOptions(noteID string, opts NoteGetOptions) (*Note, error) {
+	noteID = strings.TrimSpace(noteID)
+	if noteID == "" {
+		return nil, fmt.Errorf("noteId 不能为空")
+	}
 	q := url.Values{"noteId": {noteID}}
+	if strings.TrimSpace(opts.WithShortUrl) != "" {
+		q.Set("withShortUrl", strings.TrimSpace(opts.WithShortUrl))
+	}
 	raw, err := doGet(c, "/note/querySingleNoteDetail?"+q.Encode())
 	if err != nil {
 		return nil, err
@@ -117,20 +191,73 @@ func (c *Client) NoteGet(noteID string) (*Note, error) {
 	return &note, nil
 }
 
-// NoteCreate creates a note (phase-1: text).
+// NoteGetWithAppend queries main note plus append segments.
+func (c *Client) NoteGetWithAppend(noteID string) (*NoteAppendDetail, error) {
+	noteID = strings.TrimSpace(noteID)
+	if noteID == "" {
+		return nil, fmt.Errorf("noteId 不能为空")
+	}
+	q := url.Values{"noteId": {noteID}}
+	raw, err := doGet(c, "/note/qryNoteDetailInfoAndAppend?"+q.Encode())
+	if err != nil {
+		return nil, err
+	}
+	var detail NoteAppendDetail
+	if err := json.Unmarshal(raw, &detail); err != nil {
+		return nil, fmt.Errorf("parsing note append detail: %w", err)
+	}
+	return &detail, nil
+}
+
+// NoteCreate creates a note (text / voice / image / document / link).
 func (c *Client) NoteCreate(params NoteCreateParams) (*Note, error) {
 	params.NoteType = strings.TrimSpace(params.NoteType)
 	if params.NoteType == "" {
 		params.NoteType = "text"
 	}
-	if params.NoteType != "text" {
-		return nil, fmt.Errorf("当前仅支持创建文字笔记（--type text），其他类型待 file upload 就绪后开放")
-	}
-	if params.TextContent == nil {
-		return nil, fmt.Errorf("缺少 textContent")
-	}
-	if strings.TrimSpace(params.TextContent.Content) == "" && strings.TrimSpace(params.TextContent.Title) == "" {
-		return nil, fmt.Errorf("title 与 content 不能同时为空")
+	switch params.NoteType {
+	case "text":
+		if params.TextContent == nil {
+			return nil, fmt.Errorf("缺少 textContent")
+		}
+		if strings.TrimSpace(params.TextContent.Content) == "" && strings.TrimSpace(params.TextContent.Title) == "" {
+			return nil, fmt.Errorf("title 与 content 不能同时为空")
+		}
+	case "voice":
+		if params.VoiceContent == nil {
+			return nil, fmt.Errorf("缺少 voiceContent")
+		}
+		if strings.TrimSpace(params.VoiceContent.VoiceFileID) == "" {
+			return nil, fmt.Errorf("voiceContent.voiceFileId 不能为空")
+		}
+		if strings.TrimSpace(params.VoiceContent.RecordingSource) == "" {
+			params.VoiceContent.RecordingSource = "offlineImport"
+		}
+	case "image":
+		if params.ImageContent == nil || len(params.ImageContent.FileIds) == 0 {
+			return nil, fmt.Errorf("缺少 imageContent.fileIds")
+		}
+		for i, f := range params.ImageContent.FileIds {
+			if strings.TrimSpace(f.FileID) == "" {
+				return nil, fmt.Errorf("imageContent.fileIds[%d].fileId 不能为空", i)
+			}
+		}
+	case "document":
+		if params.DocumentContent == nil {
+			return nil, fmt.Errorf("缺少 documentContent")
+		}
+		if strings.TrimSpace(params.DocumentContent.FileID) == "" {
+			return nil, fmt.Errorf("documentContent.fileId 不能为空")
+		}
+	case "link":
+		if params.LinkContent == nil {
+			return nil, fmt.Errorf("缺少 linkContent")
+		}
+		if strings.TrimSpace(params.LinkContent.URL) == "" {
+			return nil, fmt.Errorf("linkContent.url 不能为空")
+		}
+	default:
+		return nil, fmt.Errorf("不支持的笔记类型 %q（支持 text/voice/image/document/link）", params.NoteType)
 	}
 	if params.SceneID != nil {
 		params.SceneID = coerceKnowledgeID(params.SceneID)
@@ -191,6 +318,70 @@ func (c *Client) NoteStatus(noteID string) (*NoteStatus, error) {
 	return &st, nil
 }
 
+// isTerminalNoteState reports whether note processing has reached a final state.
+func isTerminalNoteState(state string) bool {
+	switch state {
+	case "completed", "failed", "recognizing_failed", "analyzing_failed":
+		return true
+	default:
+		return false
+	}
+}
+
+// NoteWait polls NoteStatus until a terminal state or timeout (default 10 minutes).
+// Polling is paced by the client's >=500ms rate limiter.
+func (c *Client) NoteWait(noteID string, timeout time.Duration) (*NoteStatus, error) {
+	noteID = strings.TrimSpace(noteID)
+	if noteID == "" {
+		return nil, fmt.Errorf("noteId 不能为空")
+	}
+	if timeout <= 0 {
+		timeout = DefaultNoteWaitTimeout
+	}
+	deadline := time.Now().Add(timeout)
+	var last *NoteStatus
+	for {
+		st, err := c.NoteStatus(noteID)
+		if err != nil {
+			return last, err
+		}
+		last = st
+		if isTerminalNoteState(st.NoteState) {
+			return st, nil
+		}
+		if time.Now().After(deadline) {
+			return last, &RequestError{
+				APIError: APIError{
+					Code:      "timeout",
+					Message:   fmt.Sprintf("等待笔记处理超时（当前状态 %s）", st.NoteState),
+					Reason:    "note_wait_timeout",
+					Retryable: true,
+				},
+			}
+		}
+		// Next NoteStatus call is paced by waitRateLimit (>=500ms).
+	}
+}
+
+// DownloadNoteAudio downloads note audio via GET /note/downloadNoteAudio.
+// Sets APP-ID from ZHIZAI_APP_ID or last upload appId when available.
+func (c *Client) DownloadNoteAudio(noteID, destPath string) error {
+	noteID = strings.TrimSpace(noteID)
+	if noteID == "" {
+		return fmt.Errorf("noteId 不能为空")
+	}
+	destPath = strings.TrimSpace(destPath)
+	if destPath == "" {
+		return fmt.Errorf("目标路径不能为空")
+	}
+	q := url.Values{"noteId": {noteID}}
+	headers := map[string]string{}
+	if appID := c.ResolveAppID(); appID != "" {
+		headers["APP-ID"] = appID
+	}
+	return c.doBinaryGET("/note/downloadNoteAudio?"+q.Encode(), destPath, headers)
+}
+
 // NoteTypeLabel returns the Chinese label for a note type.
 func NoteTypeLabel(noteType string) string {
 	switch noteType {
@@ -204,6 +395,8 @@ func NoteTypeLabel(noteType string) string {
 		return "链接"
 	case "image":
 		return "图片"
+	case "video":
+		return "视频"
 	case "knowCard":
 		return "知识卡片"
 	default:
@@ -227,6 +420,10 @@ func NoteStateLabel(state string) string {
 		return "总结中"
 	case "failed":
 		return "失败"
+	case "recognizing_failed":
+		return "转写失败"
+	case "analyzing_failed":
+		return "总结失败"
 	default:
 		if state == "" {
 			return "-"
