@@ -28,6 +28,15 @@ func NewNotesCmd() *cobra.Command {
 	var all bool
 	var title string
 	var noteType string
+	var abstract string
+	var summary string
+	var content string
+	var start string
+	var end string
+	var from string
+	var to string
+	var withContent bool
+	var withShortURL bool
 
 	cmd := &cobra.Command{
 		Use:   "notes",
@@ -36,12 +45,40 @@ func NewNotesCmd() *cobra.Command {
 		Example: `  zhizai notes
   zhizai notes --limit 10
   zhizai notes --all
-  zhizai notes --title 会议 -o json`,
+  zhizai notes --title 会议 -o json
+  zhizai notes --abstract 渠道 --from "2026-09-01 00:00:00" --to "2026-09-30 23:59:59"
+  zhizai notes --with-content --with-short-url`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := client.New()
 			fmt.Fprintf(cmd.ErrOrStderr(), "请求接口: %s\n", c.APIEndpoint("/note/queryNoteList"))
+
+			startTime := start
+			endTime := end
+			if from != "" {
+				startTime = from
+			}
+			if to != "" {
+				endTime = to
+			}
+
+			params := client.NoteListParams{
+				Title:           title,
+				AbstractContent: abstract,
+				Summary:         summary,
+				Content:         content,
+				NoteType:        noteType,
+				StartTime:       startTime,
+				EndTime:         endTime,
+			}
+			if withContent {
+				params.WithContent = "true"
+			}
+			if withShortURL {
+				params.WithShortUrl = "true"
+			}
+
 			if all {
-				return streamAll(cmd, c, title, noteType)
+				return streamAll(cmd, c, params)
 			}
 			if page <= 0 {
 				page = 1
@@ -49,13 +86,10 @@ func NewNotesCmd() *cobra.Command {
 			if limit <= 0 {
 				limit = 20
 			}
+			params.PageNum = page
+			params.PageSize = limit
 
-			data, err := c.NoteList(client.NoteListParams{
-				Title:    title,
-				NoteType: noteType,
-				PageNum:  page,
-				PageSize: limit,
-			})
+			data, err := c.NoteList(params)
 			if err != nil {
 				return err
 			}
@@ -88,10 +122,19 @@ func NewNotesCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&all, "all", false, "自动翻页获取全部")
 	cmd.Flags().StringVar(&title, "title", "", "按标题模糊筛选")
 	cmd.Flags().StringVar(&noteType, "type", "", "按类型筛选: text/voice/document/link/image/knowCard")
+	cmd.Flags().StringVar(&abstract, "abstract", "", "按摘要模糊筛选")
+	cmd.Flags().StringVar(&summary, "summary", "", "按总结模糊筛选")
+	cmd.Flags().StringVar(&content, "content", "", "按正文模糊筛选")
+	cmd.Flags().StringVar(&start, "start", "", "开始时间（创建时间范围）")
+	cmd.Flags().StringVar(&end, "end", "", "结束时间（创建时间范围）")
+	cmd.Flags().StringVar(&from, "from", "", "开始时间（--start 别名）")
+	cmd.Flags().StringVar(&to, "to", "", "结束时间（--end 别名）")
+	cmd.Flags().BoolVar(&withContent, "with-content", false, "列表结果带正文")
+	cmd.Flags().BoolVar(&withShortURL, "with-short-url", false, "列表结果带短链")
 	return cmd
 }
 
-func streamAll(cmd *cobra.Command, c *client.Client, title, noteType string) error {
+func streamAll(cmd *cobra.Command, c *client.Client, base client.NoteListParams) error {
 	isJSON := output.Format() == "json"
 	page := 1
 	var allNotes []client.Note
@@ -102,12 +145,10 @@ func streamAll(cmd *cobra.Command, c *client.Client, title, noteType string) err
 	}
 
 	for {
-		data, err := c.NoteList(client.NoteListParams{
-			Title:    title,
-			NoteType: noteType,
-			PageNum:  page,
-			PageSize: 20,
-		})
+		params := base
+		params.PageNum = page
+		params.PageSize = 20
+		data, err := c.NoteList(params)
 		if err != nil {
 			return err
 		}

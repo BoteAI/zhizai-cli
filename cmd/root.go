@@ -9,14 +9,18 @@ import (
 	"github.com/BoteAI/zhizai-cli/cmd/ask"
 	"github.com/BoteAI/zhizai-cli/cmd/auth"
 	"github.com/BoteAI/zhizai-cli/cmd/capabilities"
+	"github.com/BoteAI/zhizai-cli/cmd/cards"
 	"github.com/BoteAI/zhizai-cli/cmd/doctor"
 	"github.com/BoteAI/zhizai-cli/cmd/file"
 	"github.com/BoteAI/zhizai-cli/cmd/knowledge"
 	"github.com/BoteAI/zhizai-cli/cmd/msg"
 	"github.com/BoteAI/zhizai-cli/cmd/note"
 	"github.com/BoteAI/zhizai-cli/cmd/notes"
+	"github.com/BoteAI/zhizai-cli/cmd/recordings"
+	"github.com/BoteAI/zhizai-cli/cmd/save"
 	"github.com/BoteAI/zhizai-cli/cmd/scene"
 	"github.com/BoteAI/zhizai-cli/cmd/setup"
+	"github.com/BoteAI/zhizai-cli/cmd/summarize"
 	"github.com/BoteAI/zhizai-cli/cmd/team"
 	"github.com/BoteAI/zhizai-cli/cmd/update"
 	"github.com/BoteAI/zhizai-cli/internal/client"
@@ -100,8 +104,12 @@ func init() {
 	rootCmd.AddCommand(notes.NewNotesCmd())
 	rootCmd.AddCommand(note.NewNoteCmd())
 	rootCmd.AddCommand(file.NewFileCmd())
+	rootCmd.AddCommand(save.NewSaveCmd())
 	rootCmd.AddCommand(ask.NewAskCmd())
+	rootCmd.AddCommand(summarize.NewSummarizeCmd())
+	rootCmd.AddCommand(recordings.NewRecordingsCmd())
 	rootCmd.AddCommand(scene.NewSceneCmd())
+	rootCmd.AddCommand(cards.NewCardsCmd()) // zhizai cards
 	rootCmd.AddCommand(knowledge.NewKnowledgeCmd())
 	rootCmd.AddCommand(team.NewTeamCmd())
 	rootCmd.AddCommand(msg.NewMsgCmd())

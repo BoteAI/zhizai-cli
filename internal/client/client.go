@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -60,6 +61,7 @@ type Client struct {
 	limiter        sync.Mutex
 	lastReq        time.Time
 	refreshedOnce  bool
+	lastAppID      string // from last successful UploadFile; used for APP-ID header
 }
 
 // New creates a new API client from config / environment.
@@ -204,10 +206,26 @@ func (c *Client) newRequest(method, path string, body io.Reader) (*http.Request,
 	} else {
 		req.Header.Set("Authorization", c.apiKey)
 	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
+	// Content-Type is set by callers (JSON / multipart). Do not force application/json here.
 	return req, nil
+}
+
+// LastAppID returns the appId from the most recent successful UploadFile, if any.
+func (c *Client) LastAppID() string {
+	return c.lastAppID
+}
+
+// SetLastAppID stores an appId for subsequent downloadNoteAudio APP-ID headers.
+func (c *Client) SetLastAppID(appID string) {
+	c.lastAppID = strings.TrimSpace(appID)
+}
+
+// ResolveAppID returns ZHIZAI_APP_ID env, else last upload appId.
+func (c *Client) ResolveAppID() string {
+	if env := strings.TrimSpace(os.Getenv("ZHIZAI_APP_ID")); env != "" {
+		return env
+	}
+	return c.lastAppID
 }
 
 func isRetryableNetworkError(err error) bool {
@@ -255,6 +273,10 @@ func networkRequestError(err error) error {
 }
 
 func (c *Client) do(method, path string, body []byte) (json.RawMessage, error) {
+	return c.doWithHeaders(method, path, body, nil)
+}
+
+func (c *Client) doWithHeaders(method, path string, body []byte, headers map[string]string) (json.RawMessage, error) {
 	var lastErr error
 	for attempt := 0; attempt <= maxNetworkRetries; attempt++ {
 		if attempt > 0 {
@@ -269,6 +291,15 @@ func (c *Client) do(method, path string, body []byte) (json.RawMessage, error) {
 		req, err := c.newRequest(method, path, reader)
 		if err != nil {
 			return nil, err
+		}
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		for k, v := range headers {
+			if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
+				continue
+			}
+			req.Header.Set(k, v)
 		}
 
 		resp, err := c.httpClient.Do(req)
@@ -381,6 +412,10 @@ func doGet(c *Client, path string) (json.RawMessage, error) {
 }
 
 func doPost(c *Client, path string, payload any) (json.RawMessage, error) {
+	return doPostWithHeaders(c, path, payload, nil)
+}
+
+func doPostWithHeaders(c *Client, path string, payload any, headers map[string]string) (json.RawMessage, error) {
 	var body []byte
 	if payload != nil {
 		data, err := json.Marshal(payload)
@@ -389,7 +424,310 @@ func doPost(c *Client, path string, payload any) (json.RawMessage, error) {
 		}
 		body = data
 	}
-	return c.do(http.MethodPost, path, body)
+	return c.doWithHeaders(http.MethodPost, path, body, headers)
+}
+
+func (c *Client) parseSuccessEnvelope(raw []byte, statusCode int) (json.RawMessage, error) {
+	var envelope apiEnvelope
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("parsing API response: %w", err)
+	}
+	if envelope.ResultCode != "0" {
+		return nil, &RequestError{
+			APIError: APIError{
+				Code:      envelope.ResultCode,
+				Message:   envelope.ResultMsg,
+				Reason:    "api_error",
+				Retryable: envelope.ResultCode == "429",
+			},
+			StatusCode: statusCode,
+		}
+	}
+	if len(envelope.ResultObject) == 0 {
+		return json.RawMessage("null"), nil
+	}
+	return envelope.ResultObject, nil
+}
+
+// doMultipartPOST sends multipart/form-data and returns resultObject JSON.
+func (c *Client) doMultipartPOST(path string, body []byte, contentType string) (json.RawMessage, error) {
+	var lastErr error
+	for attempt := 0; attempt <= maxNetworkRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 400 * time.Millisecond)
+		}
+		c.waitRateLimit()
+
+		req, err := c.newRequest(http.MethodPost, path, bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", contentType)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			if isRetryableNetworkError(err) && attempt < maxNetworkRetries {
+				continue
+			}
+			return nil, networkRequestError(err)
+		}
+
+		raw, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			if isRetryableNetworkError(err) && attempt < maxNetworkRetries {
+				continue
+			}
+			return nil, networkRequestError(err)
+		}
+
+		if (resp.StatusCode == 400 || resp.StatusCode == 401 || resp.StatusCode == 406) &&
+			c.authMode == config.AuthModeOAuth && c.refreshToken != "" && !c.refreshedOnce {
+			c.refreshedOnce = true
+			if refreshErr := c.forceRefresh(); refreshErr == nil {
+				attempt--
+				continue
+			}
+		}
+
+		if resp.StatusCode == 400 || resp.StatusCode == 401 || resp.StatusCode == 406 {
+			return nil, &RequestError{
+				APIError: APIError{
+					Code:      fmt.Sprintf("%d", resp.StatusCode),
+					Message:   "无权限或请求无效，请检查登录状态（zhizai auth login / ZHIZAI_REC_API_KEY）",
+					Reason:    "unauthorized",
+					Retryable: false,
+				},
+				StatusCode: resp.StatusCode,
+			}
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			retryable := resp.StatusCode >= 500 || resp.StatusCode == 429
+			if retryable && attempt < maxNetworkRetries {
+				lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
+				continue
+			}
+			return nil, &RequestError{
+				APIError: APIError{
+					Code:      fmt.Sprintf("%d", resp.StatusCode),
+					Message:   string(raw),
+					Reason:    "http_error",
+					Retryable: retryable,
+				},
+				StatusCode: resp.StatusCode,
+			}
+		}
+
+		obj, err := c.parseSuccessEnvelope(raw, resp.StatusCode)
+		if err != nil {
+			var reqErr *RequestError
+			if errors.As(err, &reqErr) && reqErr.Retryable && attempt < maxNetworkRetries {
+				lastErr = err
+				continue
+			}
+			return nil, err
+		}
+		return obj, nil
+	}
+	if lastErr != nil {
+		if _, ok := lastErr.(*RequestError); ok {
+			return nil, lastErr
+		}
+		return nil, networkRequestError(lastErr)
+	}
+	return nil, fmt.Errorf("request failed after retries")
+}
+
+func isJSONContentType(ct string) bool {
+	ct = strings.ToLower(ct)
+	return strings.Contains(ct, "application/json") || strings.Contains(ct, "+json")
+}
+
+func looksLikeJSONBody(data []byte) bool {
+	trim := bytes.TrimSpace(data)
+	return len(trim) > 0 && (trim[0] == '{' || trim[0] == '[')
+}
+
+// doBinaryGET downloads a binary response to destPath, following redirects.
+// JSON error bodies and non-2xx statuses fail clearly without writing a fake file.
+func (c *Client) doBinaryGET(path, destPath string, extraHeaders map[string]string) error {
+	var lastErr error
+	for attempt := 0; attempt <= maxNetworkRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 400 * time.Millisecond)
+		}
+		c.waitRateLimit()
+
+		req, err := c.newRequest(http.MethodGet, path, nil)
+		if err != nil {
+			return err
+		}
+		for k, v := range extraHeaders {
+			if strings.TrimSpace(v) != "" {
+				req.Header.Set(k, v)
+			}
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			if isRetryableNetworkError(err) && attempt < maxNetworkRetries {
+				continue
+			}
+			return networkRequestError(err)
+		}
+
+		raw, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			if isRetryableNetworkError(err) && attempt < maxNetworkRetries {
+				continue
+			}
+			return networkRequestError(err)
+		}
+
+		if (resp.StatusCode == 400 || resp.StatusCode == 401 || resp.StatusCode == 406) &&
+			c.authMode == config.AuthModeOAuth && c.refreshToken != "" && !c.refreshedOnce {
+			c.refreshedOnce = true
+			if refreshErr := c.forceRefresh(); refreshErr == nil {
+				attempt--
+				continue
+			}
+		}
+
+		ct := resp.Header.Get("Content-Type")
+		if isJSONContentType(ct) || (resp.StatusCode >= 400 && looksLikeJSONBody(raw)) {
+			msg := strings.TrimSpace(string(raw))
+			if looksLikeJSONBody(raw) {
+				var envelope apiEnvelope
+				if json.Unmarshal(raw, &envelope) == nil {
+					if envelope.ResultMsg != "" {
+						msg = envelope.ResultMsg
+					}
+					if envelope.ResultCode != "" && envelope.ResultCode != "0" {
+						return &RequestError{
+							APIError: APIError{
+								Code:      envelope.ResultCode,
+								Message:   msg,
+								Reason:    "api_error",
+								Retryable: false,
+							},
+							StatusCode: resp.StatusCode,
+						}
+					}
+				}
+				var loose map[string]interface{}
+				if json.Unmarshal(raw, &loose) == nil {
+					if m, ok := loose["message"].(string); ok && m != "" {
+						msg = m
+					} else if m, ok := loose["resultMsg"].(string); ok && m != "" {
+						msg = m
+					}
+				}
+			}
+			if msg == "" {
+				msg = fmt.Sprintf("下载失败（HTTP %d，返回 JSON 而非文件）", resp.StatusCode)
+			}
+			code := fmt.Sprintf("%d", resp.StatusCode)
+			if resp.StatusCode == 200 {
+				code = "unexpected_json"
+			}
+			return &RequestError{
+				APIError: APIError{
+					Code:      code,
+					Message:   msg,
+					Reason:    "download_json_error",
+					Retryable: false,
+				},
+				StatusCode: resp.StatusCode,
+			}
+		}
+
+		if resp.StatusCode == 404 {
+			msg := "文件不存在"
+			if s := strings.TrimSpace(string(raw)); s != "" && !looksLikeJSONBody(raw) {
+				msg = s
+			}
+			return &RequestError{
+				APIError: APIError{
+					Code:      "404",
+					Message:   msg,
+					Reason:    "not_found",
+					Retryable: false,
+				},
+				StatusCode: 404,
+			}
+		}
+
+		if resp.StatusCode == 400 || resp.StatusCode == 401 || resp.StatusCode == 406 {
+			msg := "无权限或请求无效，请检查登录状态（zhizai auth login / ZHIZAI_REC_API_KEY）"
+			if resp.StatusCode == 401 && len(bytes.TrimSpace(raw)) == 0 {
+				msg = "无权限：当前 Key 可能未勾选该接口，请到开发者后台勾选"
+			} else if s := strings.TrimSpace(string(raw)); s != "" {
+				msg = s
+			}
+			return &RequestError{
+				APIError: APIError{
+					Code:      fmt.Sprintf("%d", resp.StatusCode),
+					Message:   msg,
+					Reason:    "unauthorized",
+					Retryable: false,
+				},
+				StatusCode: resp.StatusCode,
+			}
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			retryable := resp.StatusCode >= 500 || resp.StatusCode == 429
+			if retryable && attempt < maxNetworkRetries {
+				lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
+				continue
+			}
+			msg := strings.TrimSpace(string(raw))
+			if msg == "" {
+				msg = fmt.Sprintf("HTTP %d", resp.StatusCode)
+			}
+			return &RequestError{
+				APIError: APIError{
+					Code:      fmt.Sprintf("%d", resp.StatusCode),
+					Message:   msg,
+					Reason:    "http_error",
+					Retryable: retryable,
+				},
+				StatusCode: resp.StatusCode,
+			}
+		}
+
+		if err := writeBinaryFile(destPath, raw); err != nil {
+			return err
+		}
+		return nil
+	}
+	if lastErr != nil {
+		return networkRequestError(lastErr)
+	}
+	return fmt.Errorf("download failed after retries")
+}
+
+func writeBinaryFile(destPath string, data []byte) error {
+	destPath = strings.TrimSpace(destPath)
+	if destPath == "" {
+		return fmt.Errorf("目标路径不能为空")
+	}
+	dir := filepath.Dir(destPath)
+	if dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("创建目录失败: %w", err)
+		}
+	}
+	if err := os.WriteFile(destPath, data, 0o644); err != nil {
+		return fmt.Errorf("写入文件失败: %w", err)
+	}
+	return nil
 }
 
 // Ping verifies credentials with a minimal note list query.
