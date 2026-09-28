@@ -1,12 +1,18 @@
 BINARY     := zhizai-cli
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+TAGS       :=
 LDFLAGS    := -ldflags "-X github.com/BoteAI/zhizai-cli/internal/version.Version=$(VERSION) -s -w"
 BUILD_DIR  := dist
 
-.PHONY: build build-all clean test lint install release publish connector-zip
+.PHONY: build build-dev build-all clean test test-dev lint install install-dev release publish connector-zip
 
 build:
-	go build $(LDFLAGS) -o $(BINARY) .
+	go build -tags "$(TAGS)" $(LDFLAGS) -o $(BINARY) .
+
+# 开发构建：带 dev tag，允许 ZHIZAI_DEV=1 + ZHIZAI_ENV 切换非生产环境。
+# 发布构建（make build / build-all / GitHub Actions）不带 dev tag，物理锁死 prod。
+build-dev: TAGS=dev
+build-dev: build
 
 build-all:
 	mkdir -p $(BUILD_DIR)
@@ -22,6 +28,10 @@ clean:
 
 test:
 	go test ./...
+
+# 运行依赖环境切换能力的用例（internal/config 中带 dev tag 的测试）。
+test-dev:
+	go test -tags dev ./...
 
 lint:
 	go vet ./...
@@ -40,6 +50,10 @@ install: build
 	@ln -sf zhizai $(INSTALL_DIR)/zz
 	@echo "Alias installed: $(INSTALL_DIR)/zz -> zhizai"
 	@echo "Done."
+
+# 安装 dev 构建（可切 test/gray 联调）。
+install-dev: TAGS=dev
+install-dev: install
 
 dev-link: build
 	@mkdir -p bin

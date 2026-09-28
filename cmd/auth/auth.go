@@ -70,7 +70,7 @@ func printServiceEndpoint(out io.Writer) {
 	apiBase := config.ResolveAPIBaseURL(cfg)
 	oauthBase := config.ResolveOAuthBaseURL(cfg)
 	env := config.ActiveEnvName(cfg)
-	fmt.Fprintf(out, "服务环境: %s（开发模式 ZHIZAI_DEV=1）\n业务基址: %s\n", env, apiBase)
+	fmt.Fprintf(out, "服务环境: %s（dev 构建 + ZHIZAI_DEV=1）\n业务基址: %s\n", env, apiBase)
 	if oauthBase == apiBase {
 		fmt.Fprintf(out, "OAuth基址: %s（与业务共用）\n", oauthBase)
 	} else {

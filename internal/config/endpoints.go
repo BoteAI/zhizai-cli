@@ -42,13 +42,14 @@ type EnvEndpoints struct {
 //	| gray | https://www.zzjilu.com:9001/pc/home | ...:9001/server | ...:9001/api/v1 |
 //	| prod | https://www.zzjilu.com/pc/home | .../server | openapi.zzjilu.com/api/v1 |
 //
-// 快速切换（仅本地开发，需 export ZHIZAI_DEV=1）：
+// 快速切换（仅本地开发，需 dev 构建 + export ZHIZAI_DEV=1）：
 //  1. 环境变量 ZHIZAI_API_URL / ZHIZAI_OAUTH_URL（完整覆盖）
 //  2. config.json 的 api_url / oauth_url
 //  3. 环境变量 ZHIZAI_ENV 或 config.json 的 env（查本表）
 //  4. DefaultEnv（prod）
 //
-// 未设置 ZHIZAI_DEV=1 时（发布包默认），始终使用 EnvProd，忽略上述切换项。
+// 默认构建（含发布包）不带 dev tag，AllowEnvSwitch 恒为 false，
+// 始终使用 EnvProd，忽略上述全部切换项。
 var EnvPresets = map[string]EnvEndpoints{
 	EnvProd: {
 		APIBase:   "https://openapi.zzjilu.com/api/v1",
@@ -93,13 +94,13 @@ var DefaultAPIBaseURL = EnvPresets[DefaultEnv].APIBase
 
 // AllowEnvSwitch reports whether non-prod endpoint switching is enabled.
 //
-// Published / end-user binaries lock to production. Local developers must set:
+// 双保险，两个条件缺一不可：
+//  1. dev 构建：go build -tags dev（发布包 / npm 包不带此 tag，编译期锁死 prod）
+//  2. 运行时环境变量：export ZHIZAI_DEV=1
 //
-//	export ZHIZAI_DEV=1
-//
-// then ZHIZAI_ENV / api_url / oauth_url take effect.
+// 满足后 ZHIZAI_ENV / api_url / oauth_url 等切换项才生效。
 func AllowEnvSwitch() bool {
-	return strings.TrimSpace(os.Getenv("ZHIZAI_DEV")) == "1"
+	return devBuild && strings.TrimSpace(os.Getenv("ZHIZAI_DEV")) == "1"
 }
 
 // NormalizeEnv returns a known env name or DefaultEnv.

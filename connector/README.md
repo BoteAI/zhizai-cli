@@ -40,7 +40,7 @@ make connector-zip
 | 业务 API | `https://openapi.zzjilu.com/api/v1` | `https://www.zzjilu.com:9001/api/v1` |
 | OAuth | `https://www.zzjilu.com/server` | `https://www.zzjilu.com:9001/server` |
 | 授权页 | `https://www.zzjilu.com/oauth/device?user_code=...` | `https://www.zzjilu.com:9001/oauth/device?...` |
-| 切换 | 默认 | `ZHIZAI_DEV=1 ZHIZAI_ENV=gray` |
+| 切换 | 默认（发布包物理锁死 prod） | dev 构建（`make build-dev`）+ `ZHIZAI_DEV=1 ZHIZAI_ENV=gray` |
 
 详见 `docs/development.md` 与 `internal/config/endpoints.go`。
 

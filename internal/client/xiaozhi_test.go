@@ -109,7 +109,7 @@ func TestXiaozhiChatNotData(t *testing.T) {
 	}
 }
 
-func TestCreateTextNoteSummaryAndTemplateAndRecordings(t *testing.T) {
+func TestCreateTextNoteSummaryAndTemplate(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/note/createTextNoteSummary", func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]interface{}
@@ -133,18 +133,6 @@ func TestCreateTextNoteSummaryAndTemplateAndRecordings(t *testing.T) {
 			},
 		})
 	})
-	mux.HandleFunc("/note/querySummaryAndRecording", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("title") != "经营" {
-			t.Fatalf("title=%q", r.URL.Query().Get("title"))
-		}
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"resultCode": "0",
-			"resultMsg":  "success",
-			"resultObject": []map[string]interface{}{
-				{"noteId": "n9", "noteTitle": "经营会", "noteCreateTime": "2026-09-01", "noteStatus": "completed"},
-			},
-		})
-	})
 
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -161,11 +149,6 @@ func TestCreateTextNoteSummaryAndTemplateAndRecordings(t *testing.T) {
 	tpl, err := c.QueryTemplate("生成周报")
 	if err != nil || tpl.Output == "" {
 		t.Fatalf("tpl=%v err=%v", tpl, err)
-	}
-
-	list, err := c.QuerySummaryAndRecording(SummaryAndRecordingParams{Title: "经营"})
-	if err != nil || len(list) != 1 || list[0].NoteID != "n9" {
-		t.Fatalf("list=%v err=%v", list, err)
 	}
 }
 

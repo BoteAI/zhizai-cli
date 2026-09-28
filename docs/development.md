@@ -35,16 +35,19 @@ OpenAPI（业务）与 OAuth2（设备授权）**分属不同 base**：OAuth 走
 - OAuth：`{OAuthBase}/oauth2/device/authorize`
 - 业务：`{APIBase}/note/queryNoteList`
 
-**发布包默认锁定生产环境**，忽略 `ZHIZAI_ENV` / `api_url` 等切换项。  
-本地开发需显式打开开关后再切环境：
+**发布包物理锁死生产环境**：环境切换能力由 Go build tag `dev` 控制，发布构建（GitHub Actions / npm，均不带该 tag）在编译期移除了切换能力，即使设置 `ZHIZAI_DEV=1` / `ZHIZAI_ENV=test` / `api_url` 也只会走生产。  
+本地开发需用 dev 构建并显式打开开关：
 
 ```bash
+make build-dev            # 等价于 go build -tags dev ...（或 make install-dev 直接安装）
 export ZHIZAI_DEV=1
 export ZHIZAI_ENV=test   # 或 gray / prod
 # 也可分别覆盖：
 # export ZHIZAI_API_URL=...
 # export ZHIZAI_OAUTH_URL=...
 ```
+
+> 注意：dev 构建仅用于本地联调，**不要**分发给真实用户；`make test-dev` 可运行依赖环境切换的测试用例。
 
 ---
 

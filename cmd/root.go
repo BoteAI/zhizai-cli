@@ -16,7 +16,6 @@ import (
 	"github.com/BoteAI/zhizai-cli/cmd/msg"
 	"github.com/BoteAI/zhizai-cli/cmd/note"
 	"github.com/BoteAI/zhizai-cli/cmd/notes"
-	"github.com/BoteAI/zhizai-cli/cmd/recordings"
 	"github.com/BoteAI/zhizai-cli/cmd/save"
 	"github.com/BoteAI/zhizai-cli/cmd/scene"
 	"github.com/BoteAI/zhizai-cli/cmd/setup"
@@ -107,7 +106,6 @@ func init() {
 	rootCmd.AddCommand(save.NewSaveCmd())
 	rootCmd.AddCommand(ask.NewAskCmd())
 	rootCmd.AddCommand(summarize.NewSummarizeCmd())
-	rootCmd.AddCommand(recordings.NewRecordingsCmd())
 	rootCmd.AddCommand(scene.NewSceneCmd())
 	rootCmd.AddCommand(cards.NewCardsCmd()) // zhizai cards
 	rootCmd.AddCommand(knowledge.NewKnowledgeCmd())

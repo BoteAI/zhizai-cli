@@ -54,7 +54,6 @@ func NewCapabilitiesCmd() *cobra.Command {
 					"ask refs":         "查询问小智参考文档",
 					"ask template":     "动态成文模版（可选附带笔记）",
 					"summarize":        "文字流式总结（SSE）",
-					"recordings":       "按标题/时间查总结与录音",
 					"cards":            "我创建的知识卡分页列表",
 				},
 				Guarantees: map[string]any{

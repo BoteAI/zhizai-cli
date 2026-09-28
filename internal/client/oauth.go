@@ -331,7 +331,7 @@ func (c *Client) postOAuthForm(path string, form url.Values) (*apiEnvelope, erro
 	if strings.TrimSpace(env.ResultCode) == "" {
 		msg := fmt.Sprintf("OAuth 接口不可用 HTTP %d（%s）", resp.StatusCode, reqURL)
 		if resp.StatusCode == http.StatusNotFound {
-			msg += "；当前 OAuth 基址可能未开通设备授权，请联系后端，或本地 ZHIZAI_DEV=1 ZHIZAI_ENV=test|gray 联调"
+			msg += "；当前 OAuth 基址可能未开通设备授权，请联系后端，或本地 dev 构建（make build-dev）+ ZHIZAI_DEV=1 ZHIZAI_ENV=test|gray 联调"
 		}
 		return nil, &RequestError{
 			APIError: APIError{
