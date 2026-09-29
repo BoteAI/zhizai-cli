@@ -104,7 +104,7 @@ func TestKnowledgeWritePaths(t *testing.T) {
 	mux.HandleFunc("/note/createNoteKnowledge", func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]interface{}
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		if body["knowledgeName"] != "工作笔记集" || body["knowledgeAttribute"] != "private" {
+		if body["knowledgeName"] != "工作笔记集" || body["knowledgeAttribute"] != "private" || body["knowledgePublic"] != "F" {
 			t.Fatalf("create body=%v", body)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{

@@ -134,6 +134,8 @@ type CreateKnowledgeParams struct {
 	KnowledgeName      string `json:"knowledgeName"`
 	KnowledgeDetail    string `json:"knowledgeDetail,omitempty"`
 	KnowledgeAttribute string `json:"knowledgeAttribute,omitempty"`
+	// KnowledgePublic 是否公开(T/F)；后端要求当前固定传 F。
+	KnowledgePublic string `json:"knowledgePublic"`
 }
 
 // KnowledgeCatalogParams is POST /note/queryKnowledgeCatalog.
@@ -222,6 +224,8 @@ func (c *Client) CreateKnowledge(params CreateKnowledgeParams) (string, error) {
 	if strings.TrimSpace(params.KnowledgeAttribute) == "" {
 		params.KnowledgeAttribute = "private"
 	}
+	// 后端要求固定传 knowledgePublic=F（不公开）。
+	params.KnowledgePublic = "F"
 	raw, err := doPost(c, "/note/createNoteKnowledge", params)
 	if err != nil {
 		return "", err
