@@ -79,5 +79,7 @@ CLI `--no-open` 输出示例：
 ## 依赖的 CLI
 
 - npm：`@zhizai/cli@latest`（与本仓库发版版本一致时体验最佳）
-- 安装走 npm optional 平台包（如 `@zhizai/cli-darwin-arm64`），`cli.json` 的 `init` 命令无需改动
+- 安装走 npm optional 平台包（如 `@zhizai/cli-darwin-arm64`、`@zhizai/cli-windows-arm64`、`@zhizai/cli-openharmony-arm64`），`cli.json` 的 `init` 命令无需改动
+- WorkBuddy 托管 Node：`runtime.version` 为 `>=16`（勿锁死单一大版本，便于复用已有运行时）
+- 鸿蒙：WorkBuddy `init` 仍只有 darwin/linux/win32；若本机 Node 为 `openharmony`，依赖 optional 包 `@zhizai/cli-openharmony-arm64`（静态 linux/arm64）。若连接器点击无响应，仍需 WorkBuddy 鸿蒙端支持 CLI 安装流程
 - 需支持 `auth login --no-open` 与机器可读 `[verify_url]` 输出

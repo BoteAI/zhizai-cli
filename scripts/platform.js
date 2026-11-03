@@ -58,12 +58,42 @@ const PLATFORMS = [
     binary: 'zhizai.exe',
     archiveExt: '.zip',
   },
+  {
+    key: 'windows-arm64',
+    pkg: '@zhizai/cli-windows-arm64',
+    goos: 'windows',
+    goarch: 'arm64',
+    os: ['win32'],
+    cpu: ['arm64'],
+    binary: 'zhizai.exe',
+    archiveExt: '.zip',
+  },
+  // HarmonyOS / OpenHarmony Node reports process.platform === "openharmony".
+  // Pure-Go static linux/arm64 ELF is used (CGO disabled); same approach as
+  // several CLIs that treat OpenHarmony userspace as Linux-ABI compatible.
+  {
+    key: 'openharmony-arm64',
+    pkg: '@zhizai/cli-openharmony-arm64',
+    goos: 'openharmony',
+    goarch: 'arm64',
+    buildGoos: 'linux',
+    buildGoarch: 'arm64',
+    os: ['openharmony'],
+    cpu: ['arm64'],
+    binary: 'zhizai',
+    archiveExt: '.tar.gz',
+  },
 ];
 
 function nodePlatformArch() {
   const platform = os.platform();
   const arch = os.arch();
-  const platformMap = { darwin: 'darwin', linux: 'linux', win32: 'windows' };
+  const platformMap = {
+    darwin: 'darwin',
+    linux: 'linux',
+    win32: 'windows',
+    openharmony: 'openharmony',
+  };
   const archMap = { x64: 'x64', arm64: 'arm64' };
   const p = platformMap[platform];
   const a = archMap[arch];

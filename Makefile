@@ -21,6 +21,9 @@ build-all:
 	GOOS=linux   GOARCH=amd64  go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY)_linux_amd64   .
 	GOOS=linux   GOARCH=arm64  go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY)_linux_arm64   .
 	GOOS=windows GOARCH=amd64  go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY)_windows_amd64.exe .
+	GOOS=windows GOARCH=arm64  go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY)_windows_arm64.exe .
+	# OpenHarmony package uses static linux/arm64 binary (CGO disabled).
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY)_openharmony_arm64 .
 
 clean:
 	rm -f $(BINARY)

@@ -17,6 +17,8 @@ test('PLATFORMS cover expected npm package names', () => {
     '@zhizai/cli-darwin-x64',
     '@zhizai/cli-linux-arm64',
     '@zhizai/cli-linux-x64',
+    '@zhizai/cli-openharmony-arm64',
+    '@zhizai/cli-windows-arm64',
     '@zhizai/cli-windows-x64',
   ].sort());
 });
@@ -31,9 +33,15 @@ test('releaseAssetName uses goarch naming', () => {
   const darwinArm = PLATFORMS.find(p => p.key === 'darwin-arm64');
   const darwinX64 = PLATFORMS.find(p => p.key === 'darwin-x64');
   const win = PLATFORMS.find(p => p.key === 'windows-x64');
+  const winArm = PLATFORMS.find(p => p.key === 'windows-arm64');
   assert.equal(releaseAssetName('0.0.10', darwinArm), 'zhizai-cli_0.0.10_darwin_arm64.tar.gz');
   assert.equal(releaseAssetName('0.0.10', darwinX64), 'zhizai-cli_0.0.10_darwin_amd64.tar.gz');
   assert.equal(releaseAssetName('0.0.10', win), 'zhizai-cli_0.0.10_windows_amd64.zip');
+  assert.equal(releaseAssetName('0.0.10', winArm), 'zhizai-cli_0.0.10_windows_arm64.zip');
+  const ohos = PLATFORMS.find(p => p.key === 'openharmony-arm64');
+  assert.equal(releaseAssetName('0.0.10', ohos), 'zhizai-cli_0.0.10_openharmony_arm64.tar.gz');
+  assert.equal(ohos.buildGoos, 'linux');
+  assert.deepEqual(ohos.os, ['openharmony']);
 });
 
 test('githubDownloadURL points at GitHub releases', () => {

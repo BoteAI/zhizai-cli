@@ -1,7 +1,7 @@
 {
   "runtime": {
     "type": "node",
-    "version": "20"
+    "version": ">=16"
   },
   "npmRegistries": [
     "https://registry.npmmirror.com",

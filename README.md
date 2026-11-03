@@ -32,7 +32,7 @@ zhizai version
 zz version
 ```
 
-平台包形如 `@zhizai/cli-darwin-arm64`、`@zhizai/cli-windows-x64`；也可从 [GitHub Releases](https://github.com/BoteAI/zhizai-cli/releases) 下载压缩包，解压后将 `zhizai` / `zhizai.exe` 放到 `PATH` 中。
+平台包形如 `@zhizai/cli-darwin-arm64`、`@zhizai/cli-windows-x64`、`@zhizai/cli-windows-arm64`、`@zhizai/cli-openharmony-arm64`（鸿蒙 Node 的 `process.platform` 为 `openharmony`，使用静态 linux/arm64 ABI 产物）；也可从 [GitHub Releases](https://github.com/BoteAI/zhizai-cli/releases) 下载压缩包，解压后将 `zhizai` / `zhizai.exe` 放到 `PATH` 中。
 
 ---
 

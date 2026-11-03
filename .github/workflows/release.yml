@@ -30,6 +30,16 @@ jobs:
           - goos: windows
             goarch: amd64
             name: zhizai-cli_windows_amd64.exe
+          - goos: windows
+            goarch: arm64
+            name: zhizai-cli_windows_arm64.exe
+          # OpenHarmony / HarmonyOS: Node reports platform "openharmony".
+          # Build pure-Go static linux/arm64 and package under openharmony name.
+          - goos: openharmony
+            goarch: arm64
+            build_goos: linux
+            build_goarch: arm64
+            name: zhizai-cli_openharmony_arm64
     steps:
       - uses: actions/checkout@v4
 
@@ -39,21 +49,24 @@ jobs:
 
       - name: Build
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
+          GOOS: ${{ matrix.build_goos || matrix.goos }}
+          GOARCH: ${{ matrix.build_goarch || matrix.goarch }}
+          ASSET_GOOS: ${{ matrix.goos }}
+          ASSET_GOARCH: ${{ matrix.goarch }}
         run: |
           VERSION=${GITHUB_REF_NAME}
           VERSION_NUM=${VERSION#v}
-          if [ "${{ matrix.goos }}" = "windows" ]; then
+          if [ "${ASSET_GOOS}" = "windows" ]; then
             BINARY_NAME="zhizai.exe"
           else
             BINARY_NAME="zhizai"
           fi
+          export CGO_ENABLED=0
           go build -ldflags "-X github.com/BoteAI/zhizai-cli/internal/version.Version=${VERSION} -s -w" -o "${BINARY_NAME}" .
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            zip "zhizai-cli_${VERSION_NUM}_${{ matrix.goos }}_${{ matrix.goarch }}.zip" "${BINARY_NAME}"
+          if [ "${ASSET_GOOS}" = "windows" ]; then
+            zip "zhizai-cli_${VERSION_NUM}_${ASSET_GOOS}_${ASSET_GOARCH}.zip" "${BINARY_NAME}"
           else
-            tar -czf "zhizai-cli_${VERSION_NUM}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz" "${BINARY_NAME}"
+            tar -czf "zhizai-cli_${VERSION_NUM}_${ASSET_GOOS}_${ASSET_GOARCH}.tar.gz" "${BINARY_NAME}"
           fi
 
       - name: Upload artifact
@@ -121,3 +134,22 @@ jobs:
           export VERSION
           chmod +x scripts/publish-npm-packages.sh
           bash scripts/publish-npm-packages.sh
+
+      - name: Trigger npmmirror sync
+        if: success()
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          pkgs=(
+            "@zhizai/cli"
+            "@zhizai/cli-darwin-arm64"
+            "@zhizai/cli-darwin-x64"
+            "@zhizai/cli-linux-arm64"
+            "@zhizai/cli-linux-x64"
+            "@zhizai/cli-openharmony-arm64"
+            "@zhizai/cli-windows-x64"
+            "@zhizai/cli-windows-arm64"
+          )
+          for pkg in "${pkgs[@]}"; do
+            echo "==> sync ${pkg}@${VERSION}"
+            curl -fsS -X PUT "https://registry.npmmirror.com/${pkg}/sync" || true
+          done
