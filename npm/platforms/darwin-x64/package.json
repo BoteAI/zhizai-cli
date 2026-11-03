@@ -1,6 +1,6 @@
 {
   "name": "@zhizai/cli-darwin-x64",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "zhizai CLI binary for darwin x64",
   "repository": {
     "type": "git",
