@@ -100,15 +100,24 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Update package version
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Sync package versions
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          CURRENT=$(node -p "require('./package.json').version")
-          if [ "$VERSION" != "$CURRENT" ]; then
-            npm version $VERSION --no-git-tag-version
-          fi
+          node scripts/sync-npm-versions.js "$VERSION"
 
-      - name: Publish
-        run: npm publish --access public
+      - name: Publish platform packages and @zhizai/cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+          DIST_DIR: dist
+        run: |
+          VERSION=${VERSION#v}
+          export VERSION
+          chmod +x scripts/publish-npm-packages.sh
+          bash scripts/publish-npm-packages.sh

@@ -1,0 +1,20 @@
+{
+  "name": "@zhizai/cli-linux-x64",
+  "version": "0.0.10",
+  "description": "zhizai CLI binary for linux x64",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BoteAI/zhizai-cli.git"
+  },
+  "license": "MIT",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "preferUnplugged": true,
+  "files": [
+    "bin/zhizai"
+  ]
+}

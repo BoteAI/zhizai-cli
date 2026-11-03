@@ -72,18 +72,18 @@ if [[ "$BRANCH" != "master" && "$BRANCH" != "main" ]]; then
 fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
-  # Allow only package.json dirty when we are about to bump; otherwise fail.
+  # Allow version-related files dirty when bumping; otherwise fail.
   DIRTY="$(git status --porcelain)"
+  ALLOWED='package\.json|connector/connector-meta\.json|npm/platforms/'
   if [[ -n "$BUMP_ARG" ]]; then
-    EXTRA="$(echo "$DIRTY" | grep -vE '^( M|M |MM) package\.json$' || true)"
+    EXTRA="$(echo "$DIRTY" | grep -vE "^( M|M |MM) (${ALLOWED})" || true)"
     if [[ -n "$EXTRA" ]]; then
       echo "error: working tree has unrelated changes; commit or stash first:" >&2
       echo "$DIRTY" >&2
       exit 1
     fi
   else
-    # version already set in package.json is OK if that's the only change
-    EXTRA="$(echo "$DIRTY" | grep -vE '^( M|M |MM|\?\?) package\.json$' || true)"
+    EXTRA="$(echo "$DIRTY" | grep -vE "^( M|M |MM|\?\?) (${ALLOWED})" || true)"
     # also ignore untracked .npmrc
     EXTRA="$(echo "$EXTRA" | grep -vE '^\?\? \.npmrc$' || true)"
     if [[ -n "$EXTRA" ]]; then
@@ -111,6 +111,13 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
   exit 1
 fi
 TAG="v${VERSION}"
+
+echo "==> Syncing npm platform package versions → ${VERSION}"
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  echo "+ node scripts/sync-npm-versions.js ${VERSION}"
+else
+  node scripts/sync-npm-versions.js "$VERSION"
+fi
 
 # Keep WorkBuddy connector-meta version aligned with package.json.
 if [[ -f connector/connector-meta.json ]]; then
@@ -144,11 +151,12 @@ run make test
 echo "==> Building"
 run make build
 
-if git diff --quiet -- package.json connector/connector-meta.json && git diff --cached --quiet -- package.json connector/connector-meta.json; then
+VERSION_PATHS=(package.json connector/connector-meta.json npm/platforms)
+if git diff --quiet -- "${VERSION_PATHS[@]}" && git diff --cached --quiet -- "${VERSION_PATHS[@]}"; then
   :
 else
-  echo "==> Committing version ${VERSION} (package.json + connector-meta)"
-  run git add package.json connector/connector-meta.json
+  echo "==> Committing version ${VERSION} (package.json + platforms + connector-meta)"
+  run git add package.json connector/connector-meta.json npm/platforms
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "+ git commit -m \"chore: release ${TAG}\""
   else
@@ -164,7 +172,7 @@ fi
 HEAD_VER="$(git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")"
 if [[ "$HEAD_VER" != "$VERSION" ]]; then
   echo "==> Committing package.json version ${VERSION} (was ${HEAD_VER} on HEAD)"
-  run git add package.json
+  run git add package.json npm/platforms
   if [[ -f connector/connector-meta.json ]]; then
     run git add connector/connector-meta.json
   fi
@@ -186,7 +194,7 @@ echo
 echo "Done. GitHub Actions will:"
 echo "  1) build multi-platform binaries"
 echo "  2) create GitHub Release ${TAG}"
-echo "  3) npm publish @zhizai/cli@${VERSION}"
+echo "  3) npm publish platform packages + @zhizai/cli@${VERSION}"
 echo
 echo "Watch: https://github.com/BoteAI/zhizai-cli/actions"
 echo "npm:   https://www.npmjs.com/package/@zhizai/cli"

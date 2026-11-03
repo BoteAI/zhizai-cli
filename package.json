@@ -20,6 +20,7 @@
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
+    "sync:npm-versions": "node scripts/sync-npm-versions.js",
     "release": "bash scripts/release.sh",
     "publish:cli": "bash scripts/publish.sh",
     "connector:zip": "bash scripts/pack-connector.sh"
@@ -27,7 +28,15 @@
   "files": [
     "bin/zhizai.js",
     "scripts/postinstall.js",
+    "scripts/platform.js",
     "skills/",
     "README.md"
-  ]
+  ],
+  "optionalDependencies": {
+    "@zhizai/cli-darwin-arm64": "0.0.10",
+    "@zhizai/cli-darwin-x64": "0.0.10",
+    "@zhizai/cli-linux-arm64": "0.0.10",
+    "@zhizai/cli-linux-x64": "0.0.10",
+    "@zhizai/cli-windows-x64": "0.0.10"
+  }
 }

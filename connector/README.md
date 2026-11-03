@@ -79,4 +79,5 @@ CLI `--no-open` 输出示例：
 ## 依赖的 CLI
 
 - npm：`@zhizai/cli@latest`（与本仓库发版版本一致时体验最佳）
+- 安装走 npm optional 平台包（如 `@zhizai/cli-darwin-arm64`），`cli.json` 的 `init` 命令无需改动
 - 需支持 `auth login --no-open` 与机器可读 `[verify_url]` 输出

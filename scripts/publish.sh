@@ -82,7 +82,7 @@ cat <<EOF
 
 GitHub Actions 随后自动:
   • 多平台二进制 → GitHub Release v${NEXT}
-  • npm publish @zhizai/cli@${NEXT}
+  • npm publish 平台包 + @zhizai/cli@${NEXT}
 
 进度: https://github.com/BoteAI/zhizai-cli/actions
 =======================================

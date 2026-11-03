@@ -6,7 +6,8 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { download, versionMatches } = require('./postinstall.js');
+const { download, versionMatches, installFromOptionalPackage } = require('./postinstall.js');
+const { getCurrentPlatform } = require('./platform.js');
 
 test('download idle timeout rejects when server sends no headers', async () => {
   const server = http.createServer(() => {
@@ -106,4 +107,14 @@ test('versionMatches requires exact version', () => {
   assert.equal(versionMatches('zhizai version v1.2.3', '1.2.3'), true);
   assert.equal(versionMatches('zhizai version 1.2.30', '1.2.3'), false);
   assert.equal(versionMatches('prefix zhizai version 1.2.3', '1.2.3'), false);
+});
+
+test('installFromOptionalPackage returns false when optional package missing', () => {
+  const spec = {
+    ...getCurrentPlatform(),
+    pkg: '@zhizai/cli-missing-for-test',
+  };
+  const dest = path.join(os.tmpdir(), `zhizai-opt-dest-${Date.now()}`, spec.binary);
+  assert.equal(installFromOptionalPackage(spec, dest), false);
+  assert.equal(fs.existsSync(dest), false);
 });

@@ -4,6 +4,7 @@ dist/
 bin/zhizai
 bin/zhizai.exe
 bin/zhizai-dev
+npm/platforms/*/bin/
 *.test
 *.out
 .DS_Store

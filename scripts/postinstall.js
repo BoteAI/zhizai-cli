@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// postinstall.js — downloads the zhizai binary for the current platform.
+// postinstall.js — prefer optional platform npm package; fallback to GitHub Releases.
 
 'use strict';
 
@@ -10,6 +10,13 @@ const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
+const {
+  getCurrentPlatform,
+  tryResolveOptionalBinary,
+  localBinaryPath,
+  githubDownloadURL,
+  releaseAssetName,
+} = require('./platform.js');
 
 const pkg = require('../package.json');
 const VERSION = pkg.version;
@@ -44,26 +51,16 @@ function parseVersionFromOutput(out, expectedVersion) {
 }
 
 function getPlatform() {
-  const platform = os.platform();
-  const arch = os.arch();
-
-  const platformMap = { darwin: 'darwin', linux: 'linux', win32: 'windows' };
-  const archMap = { x64: 'amd64', arm64: 'arm64' };
-
-  const p = platformMap[platform];
-  const a = archMap[arch];
-  if (!p || !a) throw new Error(`Unsupported platform: ${platform}/${arch}`);
-  return { platform: p, arch: a };
+  const spec = getCurrentPlatform();
+  return { platform: spec.goos, arch: spec.goarch, spec };
 }
 
 function getBinaryName(platform) {
-  return platform.platform === 'windows' ? 'zhizai.exe' : 'zhizai';
+  return platform.spec ? platform.spec.binary : (platform.platform === 'windows' ? 'zhizai.exe' : 'zhizai');
 }
 
 function getDownloadURL(platform) {
-  const ext = platform.platform === 'windows' ? '.zip' : '.tar.gz';
-  const asset = `zhizai-cli_${VERSION}_${platform.platform}_${platform.arch}${ext}`;
-  return `https://github.com/${REPO}/releases/download/v${VERSION}/${asset}`;
+  return githubDownloadURL(VERSION, platform.spec, REPO);
 }
 
 function getWindowsExtractArgs(archivePath, destinationPath) {
@@ -279,6 +276,34 @@ async function download(url, destination, options = {}, redirects = 0) {
   throw lastError;
 }
 
+function copyBinary(sourcePath, destinationPath) {
+  fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+  fs.copyFileSync(sourcePath, destinationPath);
+  if (process.platform !== 'win32') {
+    fs.chmodSync(destinationPath, 0o755);
+  }
+}
+
+function installFromOptionalPackage(spec, binaryPath) {
+  const optionalBinary = tryResolveOptionalBinary(spec);
+  if (!optionalBinary) return false;
+
+  if (fs.existsSync(binaryPath)) {
+    try {
+      const result = spawnSync(binaryPath, ['version'], { encoding: 'utf8' });
+      const out = (result.stdout || '').trim();
+      if (result.status === 0 && versionMatches(out, VERSION)) {
+        console.log(`zhizai v${VERSION} already installed, skipping.`);
+        return true;
+      }
+    } catch (_) {}
+  }
+
+  copyBinary(optionalBinary, binaryPath);
+  console.log(`zhizai installed from ${spec.pkg} at ${binaryPath}`);
+  return true;
+}
+
 async function installArchive({ platform, binDir, binaryName, binaryPath, url, tmpFile }) {
   try {
     await download(url, tmpFile);
@@ -303,12 +328,19 @@ async function installArchive({ platform, binDir, binaryName, binaryPath, url, t
 
 async function main() {
   const platform = getPlatform();
+  const spec = platform.spec;
   const binDir = path.join(__dirname, '..', 'bin');
   const binaryName = getBinaryName(platform);
-  const binaryPath = path.join(binDir, binaryName);
+  const binaryPath = localBinaryPath(binDir, spec);
   const url = getDownloadURL(platform);
-  const archiveExt = platform.platform === 'windows' ? '.zip' : '.tar.gz';
+  const archiveExt = spec.archiveExt;
   const tmpFile = path.join(os.tmpdir(), `zhizai-download-${Date.now()}${archiveExt}`);
+
+  fs.mkdirSync(binDir, { recursive: true });
+
+  if (installFromOptionalPackage(spec, binaryPath)) {
+    return;
+  }
 
   if (fs.existsSync(binaryPath)) {
     try {
@@ -321,10 +353,12 @@ async function main() {
     } catch (_) {}
   }
 
+  console.warn(
+    `Optional package ${spec.pkg} not found; falling back to GitHub Releases download.`
+  );
   console.log(`Downloading zhizai v${VERSION} for ${platform.platform}/${platform.arch}...`);
   console.log(`URL: ${url}`);
 
-  fs.mkdirSync(binDir, { recursive: true });
   await installArchive({ platform, binDir, binaryName, binaryPath, url, tmpFile });
 }
 
@@ -362,11 +396,14 @@ module.exports = {
   getDownloadURL,
   verifyChecksum,
   installArchive,
+  installFromOptionalPackage,
+  releaseAssetName,
 };
 
 if (require.main === module) {
   main().catch(err => {
     console.error('Failed to install zhizai:', err.message);
+    console.error('提示: 请确认能访问 npm registry（含平台包）或 GitHub Releases，然后重试 npm install -g @zhizai/cli@latest');
     process.exitCode = 1;
   });
 }

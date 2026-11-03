@@ -14,7 +14,7 @@
 
 ## 安装
 
-推荐使用 npm 全局安装（会自动下载对应平台二进制）：
+推荐使用 npm 全局安装（通过 optional 平台包拉取当前系统二进制，走 npm / 镜像源，不依赖 GitHub 下载）：
 
 ```bash
 npm install -g @zhizai/cli@latest
@@ -32,7 +32,7 @@ zhizai version
 zz version
 ```
 
-也可从 [GitHub Releases](https://github.com/BoteAI/zhizai-cli/releases) 下载对应平台压缩包，解压后将 `zhizai` / `zhizai.exe` 放到 `PATH` 中。
+平台包形如 `@zhizai/cli-darwin-arm64`、`@zhizai/cli-windows-x64`；也可从 [GitHub Releases](https://github.com/BoteAI/zhizai-cli/releases) 下载压缩包，解压后将 `zhizai` / `zhizai.exe` 放到 `PATH` 中。
 
 ---
 
